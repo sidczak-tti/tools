@@ -1,0 +1,236 @@
+1. Generowanie form Comment
+
+$ php app/console generate:doctrine:form BloggerBlogBundle:Comment
+
+2. Wygenerowany formularz
+
+<?php
+// src/Blogger/BlogBundle/Form/CommentType.php
+
+namespace Blogger\BlogBundle\Form;
+
+use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\FormBuilder;
+
+class CommentType extends AbstractType
+{
+    public function buildForm(FormBuilder $builder, array $options)
+    {
+        $builder
+            ->add('user')
+            ->add('comment')
+            ->add('approved')
+            ->add('created')
+            ->add('updated')
+            ->add('blog')
+        ;
+    }
+
+    public function getName()
+    {
+        return 'blogger_blogbundle_commenttype';
+    }
+}
+
+3. src/Blogger/BlogBundle/Resources/config/routing.yml
+
+BloggerBlogBundle_comment_create:
+    pattern:  /comment/{blog_id}
+    defaults: { _controller: BloggerBlogBundle:Comment:create }
+    requirements:
+        _method:  POST
+        blog_id: \d+
+
+4.
+
+<?php
+// src/Blogger/BlogBundle/Controller/CommentController.php
+
+namespace Blogger\BlogBundle\Controller;
+
+use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+use Blogger\BlogBundle\Entity\Comment;
+use Blogger\BlogBundle\Form\CommentType;
+
+/**
+ * Comment controller.
+ */
+class CommentController extends Controller
+{
+    public function newAction($blog_id)
+    {
+        $blog = $this->getBlog($blog_id);
+
+        $comment = new Comment();
+        $comment->setBlog($blog);
+        $form   = $this->createForm(new CommentType(), $comment);
+
+        return $this->render('BloggerBlogBundle:Comment:form.html.twig', array(
+            'comment' => $comment,
+            'form'   => $form->createView()
+        ));
+    }
+
+    public function createAction($blog_id)
+    {
+        $blog = $this->getBlog($blog_id);
+
+        $comment  = new Comment();
+        $comment->setBlog($blog);
+        $request = $this->getRequest();
+        $form    = $this->createForm(new CommentType(), $comment);
+        $form->bindRequest($request);
+
+        if ($form->isValid()) {
+            // TODO: Persist the comment entity
+
+            return $this->redirect($this->generateUrl('BloggerBlogBundle_blog_show', array(
+                'id' => $comment->getBlog()->getId())) .
+                '#comment-' . $comment->getId()
+            );
+        }
+
+        return $this->render('BloggerBlogBundle:Comment:create.html.twig', array(
+            'comment' => $comment,
+            'form'    => $form->createView()
+        ));
+    }
+
+    protected function getBlog($blog_id)
+    {
+        $em = $this->getDoctrine()
+                    ->getEntityManager();
+
+        $blog = $em->getRepository('BloggerBlogBundle:Blog')->find($blog_id);
+
+        if (!$blog) {
+            throw $this->createNotFoundException('Unable to find Blog post.');
+        }
+
+        return $blog;
+    }
+
+}
+
+5. Walidacja pól formularzy
+
+<?php
+// src/Blogger/BlogBundle/Entity/Comment.php
+
+// ..
+
+use Symfony\Component\Validator\Mapping\ClassMetadata;
+use Symfony\Component\Validator\Constraints\NotBlank;
+
+// ..
+class Comment
+{
+    // ..
+
+    public static function loadValidatorMetadata(ClassMetadata $metadata)
+    {
+        $metadata->addPropertyConstraint('user', new NotBlank(array(
+            'message' => 'You must enter your name'
+        )));
+        $metadata->addPropertyConstraint('comment', new NotBlank(array(
+            'message' => 'You must enter a comment'
+        )));
+    }
+
+    // ..
+}
+
+6. Widok - src/Blogger/BlogBundle/Resources/views/Comment/form.html.twig
+
+{# src/Blogger/BlogBundle/Resources/views/Comment/form.html.twig #}
+
+<form action="{{ path('BloggerBlogBundle_comment_create', { 'blog_id' : comment.blog.id } ) }}" method="post" {{ form_enctype(form) }} class="blogger">
+    {{ form_widget(form) }}
+    <p>
+        <input type="submit" value="Submit">
+    </p>
+</form>
+
+7. src/Blogger/BlogBundle/Resources/views/Comment/create.html.twig
+
+{% extends 'BloggerBlogBundle::layout.html.twig' %}
+
+{% block title %}Add Comment{% endblock%}
+
+{% block body %}
+    <h1>Add comment for blog post "{{ comment.blog.title }}"</h1>
+    {% include 'BloggerBlogBundle:Comment:form.html.twig' with { 'form': form } %}
+{% endblock %}
+
+8.
+
+{# src/Blogger/BlogBundle/Resources/views/Blog/show.html.twig #}
+
+{# .. #}
+
+{% block body %}
+
+    {# .. #}
+
+    <section class="comments" id="comments">
+        {# .. #}
+
+        <h3>Add Comment</h3>
+        {% render 'BloggerBlogBundle:Comment:new' with { 'blog_id': blog.id } %}
+    </section>
+{% endblock %}
+
+9.
+
+// src/Blogger/BlogBundle/Entity/Blog.php
+public function __toString()
+{
+    return $this->getTitle();
+}
+
+10. Modyfikowanie pól formularza
+
+<?php
+// src/Blogger/BlogBundle/Form/CommentType.php
+
+// ..
+class CommentType extends AbstractType
+{
+    public function buildForm(FormBuilder $builder, array $options)
+    {
+        $builder
+            ->add('user')
+            ->add('comment')
+        ;
+    }
+
+    // ..
+}
+
+11. Dodawanie komentarza
+
+<?php
+// src/Blogger/BlogBundle/Controller/CommentController.php
+
+// ..
+class CommentController extends Controller
+{
+    public function createAction($blog_id)
+    {
+        // ..
+
+        if ($form->isValid()) {
+            $em = $this->getDoctrine()
+                       ->getEntityManager();
+            $em->persist($comment);
+            $em->flush();
+
+            return $this->redirect($this->generateUrl('BloggerBlogBundle_blog_show', array(
+                'id' => $comment->getBlog()->getId())) .
+                '#comment-' . $comment->getId()
+            );
+        }
+
+        // ..
+    }
+}

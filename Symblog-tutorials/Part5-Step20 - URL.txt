@@ -1,0 +1,163 @@
+1. Przyjazne adresy URL
+
+# src/Blogger/BlogBundle/Resources/config/routing.yml
+
+BloggerBlogBundle_blog_show:
+    pattern:  /{id}/{slug}
+    defaults: { _controller: BloggerBlogBundle:Blog:show }
+    requirements:
+        _method:  GET
+        id: \d+
+
+2.
+
+// src/Blogger/BlogBundle/Controller/BlogController.php
+
+public function showAction($id, $slug)
+{
+    // ..
+}
+
+3.
+
+// src/Blogger/BlogBundle/Entity/Blog.php
+
+class Blog
+{
+    // ..
+
+    /**
+     * @ORM\Column(type="string")
+     */
+    protected $slug;
+
+    // ..
+}
+
+4.
+
+$ php app/console doctrine:generate:entities Blogger
+
+$ php app/console doctrine:migrations:diff
+$ php app/console doctrine:migrations:migrate
+
+5. dodajemy metode
+
+// src/Blogger/BlogBundle/Entity/Blog.php
+
+public function slugify($text)
+{
+    // replace non letter or digits by -
+    $text = preg_replace('#[^\\pL\d]+#u', '-', $text);
+
+    // trim
+    $text = trim($text, '-');
+
+    // transliterate
+    if (function_exists('iconv'))
+    {
+        $text = iconv('utf-8', 'us-ascii//TRANSLIT', $text);
+    }
+
+    // lowercase
+    $text = strtolower($text);
+
+    // remove unwanted characters
+    $text = preg_replace('#[^-\w]+#', '', $text);
+
+    if (empty($text))
+    {
+        return 'n-a';
+    }
+
+    return $text;
+}
+
+6. Dodajemy do metody
+
+// src/Blogger/BlogBundle/Entity/Blog.php
+
+public function setTitle($title)
+{
+    $this->title = $title;
+
+    $this->setSlug($this->title);
+}
+
+7. dodajemy do metody
+
+// src/Blogger/BlogBundle/Entity/Blog.php
+
+public function setSlug($slug)
+{
+    $this->slug = $this->slugify($slug);
+}
+
+8.
+
+$ php app/console doctrine:fixtures:load
+
+9. Aktualizacja szablonu
+
+{# src/Blogger/BlogBundle/Resources/views/Page/index.html.twig #}
+
+{% extends 'BloggerBlogBundle::layout.html.twig' %}
+
+{% block body %}
+    {% for blog in blogs %}
+        <article class="blog">
+            <div class="date"><time datetime="{{ blog.created|date('c') }}">{{ blog.created|date('l, F j, Y') }}</time></div>
+            <header>
+                <h2><a href="{{ path('BloggerBlogBundle_blog_show', { 'id': blog.id, 'slug': blog.slug }) }}">{{ blog.title }}</a></h2>
+            </header>
+
+            <img src="{{ asset(['images/', blog.image]|join) }}" />
+            <div class="snippet">
+                <p>{{ blog.blog(500) }}</p>
+                <p class="continue"><a href="{{ path('BloggerBlogBundle_blog_show', { 'id': blog.id, 'slug': blog.slug }) }}">Continue reading...</a></p>
+            </div>
+
+            <footer class="meta">
+                <p>Comments: <a href="{{ path('BloggerBlogBundle_blog_show', { 'id': blog.id, 'slug': blog.slug }) }}#comments">{{ blog.comments|length }}</a></p>
+                <p>Posted by <span class="highlight">{{ blog.author }}</span> at {{ blog.created|date('h:iA') }}</p>
+                <p>Tags: <span class="highlight">{{ blog.tags }}</span></p>
+            </footer>
+        </article>
+    {% else %}
+        <p>There are no blog entries for symblog</p>
+    {% endfor %}
+{% endblock %}
+
+10.
+
+{# src/Blogger/BlogBundle/Resources/views/Page/sidebar.html.twig #}
+
+{# .. #}
+
+<a href="{{ path('BloggerBlogBundle_blog_show', { 'id': comment.blog.id, 'slug': comment.blog.slug }) }}#comment-{{ comment.id }}">
+    {{ comment.blog.title }}
+</a>
+
+{# .. #}
+
+11.
+
+// src/Blogger/BlogBundle/Controller/CommentController.php
+
+public function createAction($blog_id)
+{
+    // ..
+
+    if ($form->isValid()) {
+        // ..
+
+        return $this->redirect($this->generateUrl('BloggerBlogBundle_blog_show', array(
+            'id'    => $comment->getBlog()->getId(),
+            'slug'  => $comment->getBlog()->getSlug())) .
+            '#comment-' . $comment->getId()
+        );
+    }
+
+    // ..
+}
+

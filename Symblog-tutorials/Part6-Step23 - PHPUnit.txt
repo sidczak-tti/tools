@@ -1,0 +1,58 @@
+Help: http://www.withoutthea.com/2011/03/configuring-phpunit-on-wamp-2-x/
+
+1. Navigate to C:\Wamp\bin\php\php5.3.4 (replace with your current PHP version). 
+   Create a folder named PEAR inside the php5.3.4 directory.
+
+2. Download go-pear.phar from pear.php.net and save it to C:\Wamp\bin\php\php5.3.4\PEAR
+
+3. cd \Wamp\bin\php\php5.3.4
+
+4. php –d phar.require_hash=0 PEAR/go-pear.phar
+	local - instalation
+
+5. Open both C:\Wamp\bin\php\php5.3.4\php.ini and C:\Wamp\bin\apache\Apache2.2.17\bin\php.ini. 
+   Add C:\Wamp\bin\php\php5.3.4\PEAR to the include_path in both files.  Yours may differ slightly, but it should be similar to this:
+
+	include_path=".;C:\wamp\bin\php\php5.3.4\PEAR" <- PEAR - du¿ymi literami
+	
+	phar.require_hash = Off
+
+ W³¹czamy serwer wamp
+
+
+6.
+
+	pear list
+
+	pear channel-discover pear.phpunit.de
+	pear channel-discover pear.symfony-project.com
+	pear channel-discover components.ez.no
+
+	pear search –c pear.phpunit.de phpunit
+
+pear clear-cache
+pear update-channels
+pear install --alldeps phpunit/PHPUnit
+
+
+#	pear install –a –f phpunit/PHPUnit
+
+#PHPUnit is now installed.  The phpunit.bat file you will need is in the PEAR executables directory.  You can find this by executing pear config-show.
+
+
+//jeœli test nie dzai³a
+pear list-channels // wyœwietlanie listy
+pear upgrade-all
+pear install phpunit/PHPUnit
+
+
+
+
+7. Uruchomienie wszystkich testów
+
+	$ phpunit -c app/
+	$ phpunit -c app src\Blogger\BlogBundle\Controller\DefaultControllerTest
+
+	$ phpunit -c app src/Blogger/BlogBundle/Controller/DefaultControllerTest <- GIT
+
+

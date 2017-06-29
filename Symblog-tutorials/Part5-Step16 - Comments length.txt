@@ -1,0 +1,63 @@
+1.
+
+{# src/Blogger/BlogBundle/Resources/views/Page/index.html.twig #}
+
+{# .. #}
+
+<footer class="meta">
+    <p>Comments: {{ blog.comments|length }}</p>
+    <p>Posted by <span class="highlight">{{ blog.author }}</span> at {{ blog.created|date('h:iA') }}</p>
+    <p>Tags: <span class="highlight">{{ blog.tags }}</span></p>
+</footer>
+
+{# .. #}
+
+2.
+
+// src/Blogger/BlogBundle/Entity/Blog.php
+
+/**
+ * @ORM\OneToMany(targetEntity="Comment", mappedBy="blog")
+ */
+protected $comments;
+
+3.
+
+// src/Blogger/BlogBundle/Repository/BlogRepository.php
+
+public function getLatestBlogs($limit = null)
+{
+    $qb = $this->createQueryBuilder('b')
+               ->select('b, c')
+               ->leftJoin('b.comments', 'c')
+               ->addOrderBy('b.created', 'DESC');
+
+    if (false === is_null($limit))
+        $qb->setMaxResults($limit);
+
+    return $qb->getQuery()
+              ->getResult();
+}
+
+4.
+
+{# src/Blogger/BlogBundle/Resources/views/Page/index.html.twig #}
+
+{# .. #}
+
+<footer class="meta">
+    <p>Comments: <a href="{{ path('BloggerBlogBundle_blog_show', { 'id': blog.id }) }}#comments">{{ blog.comments|length }}</a></p>
+    <p>Posted by <span class="highlight">{{ blog.author }}</span> at {{ blog.created|date('h:iA') }}</p>
+    <p>Tags: <span class="highlight">{{ blog.tags }}</span></p>
+</footer>
+
+{# .. #}
+
+
+Jeœli nie zadzai³a to usuwamy bazê danych i tworzymy j¹ od pocz¹tku
+wszeœniej wstawi³em x w katalogu doctrine: src\Blogger\BlogBundle\Resources\config\xdoctrine
+
+php app/console doctrine:generate:entities BloggerBlogBundle
+php app/console doctrine:database:create
+php app/console doctrine:schema:create
+php app/console doctrine:fixtures:load

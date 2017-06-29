@@ -1,0 +1,1175 @@
+1. Dodanie linka prowadz¹cego do formularza
+
+	<!-- src/Ens/JobeetBundle/Resources/views/layout.html.twig -->
+	<a href="{{ path('ens_job_new') }}">Post a Job</a>
+
+
+2. Zmiana metody (dodanie routingu do nowej oferty)
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function createAction()
+{
+  $entity  = new Job();
+  $request = $this->getRequest();
+  $form    = $this->createForm(new JobType(), $entity);
+  $form->bindRequest($request);
+ 
+  if ($form->isValid()) {
+    $em = $this->getDoctrine()->getEntityManager();
+ 
+    $em->persist($entity);
+    $em->flush();
+ 
+    return $this->redirect($this->generateUrl('ens_job_show', array(
+      'company' => $entity->getCompanySlug(),
+      'location' => $entity->getLocationSlug(),
+      'id' => $entity->getId(),
+      'position' => $entity->getPositionSlug()
+    )));
+  }
+ 
+  return $this->render('EnsJobeetBundle:Job:new.html.twig', array(
+    'entity' => $entity,
+    'form'   => $form->createView()
+  ));
+}
+
+3. Usuniêcie niepotrzebnych pól formularza
+
+// src/Ens/JobeetBundle/Form/JobType.php
+ 
+namespace Ens\JobeetBundle\Form;
+ 
+use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\FormBuilder;
+ 
+class JobType extends AbstractType
+{
+    public function buildForm(FormBuilder $builder, array $options)
+    {
+        $builder->add('category');
+        $builder->add('type');
+        $builder->add('company');
+        $builder->add('logo');
+        $builder->add('url');
+        $builder->add('position');
+        $builder->add('location');
+        $builder->add('description');
+        $builder->add('how_to_apply');
+        $builder->add('token');
+        $builder->add('is_public');
+        $builder->add('email');
+    }
+ 
+    public function getName()
+    {
+        return 'ens_jobeetbundle_jobtype';
+    }
+}
+
+4. Dodajemy walidacjê formularza. Tworzymy plik:
+
+# src/Ens/JobeetBundle/Resources/config/validation.yml
+ 
+Ens\JobeetBundle\Entity\Job:
+    properties:
+    email:
+        - NotBlank: ~
+        - Email: ~
+
+
+5.Dodanie do formularza Type w postaci radiobutton-ów
+
+// src/Ens/JobeetBundle/Form/JobType.php
+// ...
+ 
+use Ens\JobeetBundle\Entity\Job; //musimy do³¹czyæ klasê Job, a w niej dodaæ metody z punktu 6
+ 
+class JobType extends AbstractType
+{
+    public function buildForm(FormBuilder $builder, array $options)
+    {
+        // ...
+ 
+        $builder->add('type', 'choice', array('choices' => Job::getTypes(), 'expanded' => true));
+ 
+        // ...
+    }
+ 
+    // ...
+ 
+}
+
+
+6. Dodanie metod
+
+
+// src/Ens/JobeetBundle/Entity/Job.php //
+// ...
+ 
+public static function getTypes()
+{
+  return array('full-time' => 'Full time', 'part-time' => 'Part time', 'freelance' => 'Freelance');
+}
+ 
+public static function getTypeValues()
+{
+  return array_keys(self::getTypes());
+}
+
+
+7. Dodanie walidacji dla Type
+
+# src/Ens/JobeetBundle/Resources/config/validation.yml
+ 
+Ens\JobeetBundle\Entity\Job:
+    properties:
+        type:
+            - NotBlank: ~
+            - Choice: { callback: getTypeValues }
+        email:
+            - NotBlank: ~
+            - Email: ~
+
+8. Dodanie nowych labeli do formularza:
+
+$builder->add('logo', null, array('label' => 'Company logo'));
+$builder->add('how_to_apply', null, array('label' => 'How to apply?'));
+$builder->add('is_public', null, array('label' => 'Public?'));
+
+
+9. Dodanie walidacji dla reszty pól
+
+
+# src/Ens/JobeetBundle/Resources/config/validation.yml
+ 
+Ens\JobeetBundle\Entity\Job:
+    properties:
+        category:
+            - NotBlank: ~
+        type:
+            - NotBlank: ~
+            - Choice: {callback: getTypeValues}
+        company:
+            - NotBlank: ~
+            - MinLength: 3
+        position:
+            - NotBlank: ~
+        location:
+            - NotBlank: ~
+        description:
+            - NotBlank: ~
+        how_to_apply:
+            - NotBlank: ~
+        token:
+            - NotBlank: ~
+        email:
+            - NotBlank: ~
+            - Email: ~
+
+
+
+10. Wczytywanie pliku przez formularz - dodajemy nowe pole
+Handling File Uploads in Symfony2
+
+// src/Ens/JobeetBundle/Entity/Job.php
+// ...
+ 
+public $file;
+
+11. W formularzu zmieniamy "Company logo" na:
+
+$builder->add('file', 'file', array('label' => 'Company logo', 'required' => false));
+
+12. Dodajemy walidator dla pliku
+
+# src/Ens/JobeetBundle/Resources/config/validation.yml
+Ens\JobeetBundle\Entity\Job:
+    properties:
+        # ...
+        file:
+            - Image: ~
+
+13. Dodanie do kontrolera miejsca gdzie ma byæ zapisany wybrany plik
+
+// src/Ens/JobeedBundle/Controller/JobController.php
+// ...
+ 
+public function createAction()
+{
+  // ...
+ 
+  if ($form->isValid()) {
+    $em = $this->getDoctrine()->getEntityManager();
+ 
+    $entity->file->move(__DIR__.'/../../../../web/uploads/jobs', $entity->file->getClientOriginalName());
+    $entity->setLogo($entity->file->getClientOriginalName());
+ 
+    $em->persist($entity);
+    $em->flush();
+ 
+    return $this->redirect($this->generateUrl('ens_job_show', array(
+      'company' => $entity->getCompanySlug(),
+      'location' => $entity->getLocationSlug(),
+      'id' => $entity->getId(),
+      'position' => $entity->getPositionSlug()
+    )));
+  }
+  // ...
+}
+
+14. Rêcznie tworzymy katalog gdzie maj¹ byæ zapisane pliki web/uploads/jobs/
+
+15.Opcjonalnie dodajemy nastêpujace metody:
+
+/ src/Ens/JobeetBundle/Entity/Job.php
+
+protected function getUploadDir()
+{
+    return 'uploads/jobs';
+}
+ 
+protected function getUploadRootDir()
+{
+    return __DIR__.'/../../../../web/'.$this->getUploadDir();
+}
+ 
+public function getWebPath()
+{
+    return null === $this->logo ? null : $this->getUploadDir().'/'.$this->logo;
+}
+ 
+public function getAbsolutePath()
+{
+    return null === $this->logo ? null : $this->getUploadRootDir().'/'.$this->logo;
+}
+
+
+16. Zapisywanie œcie¿ki bezwzglêdnej do bazy danych
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/Job.orm.yml
+Ens\JobeetBundle\Entity\Job:
+# ...
+ 
+  lifecycleCallbacks:
+    prePersist: [ preUpload, setCreatedAtValue, setExpiresAtValue ]
+    #preUpdate: [ preUpload, setUpdatedAtValue ] - nie dzia³a preUpload
+    preUpdate: [ setUpdatedAtValue ]
+    postPersist: [ upload ]
+    #postUpdate: [ upload ] - nie dzia³a
+    postRemove: [ removeUpload ]
+
+
+php app/console doctrine:generate:entities EnsJobeetBundle
+
+
+17. Dodajemy nastêpuj¹ce metody:
+
+a. Tworzenie unikalnej nazwy pliku
+b. Usuniêcie pliku jeœli praca jest usuwana
+
+// src/Ens/JobeetBundle/Entity/Job.php
+// ...
+ 
+/**
+* @ORM\prePersist
+*/
+public function preUpload()
+{
+  if (null !== $this->file) {
+    // do whatever you want to generate a unique name
+    //$this->logo = uniqid().".".$this->file->guessExtension();
+
+//; windows php.ini
+// extension=php_fileinfo.dll
+
+//; linux
+// extension=php_fileinfo.so
+
+	$this->logo = $this->file->guessExtension();
+  }
+}
+ 
+/**
+* @ORM\postPersist
+*/
+public function upload()
+{
+  if (null === $this->file) {
+    return;
+  }
+ 
+  // if there is an error when moving the file, an exception will
+  // be automatically thrown by move(). This will properly prevent
+  // the entity from being persisted to the database on error
+  $this->file->move($this->getUploadRootDir(), $this->logo);
+ 
+  unset($this->file);
+}
+ 
+/**
+* @ORM\postRemove
+*/
+public function removeUpload()
+{
+  if ($file = $this->getAbsolutePath()) {
+    unlink($file);
+  }
+}
+ 
+// ...
+
+
+
+Mo¿emy teraz usun¹æ nastêpuj¹ce linnie kodu
+
+// src/Ens/JobeedBundle/Controller/JobController.php
+
+z metody:
+ 
+public function createAction()
+
+    $entity->file->move(__DIR__.'/../../../../web/uploads/jobs', $entity->file->getClientOriginalName());
+    $entity->setLogo($entity->file->getClientOriginalName());
+
+18.Podmieniamy kod formularza na nastêpujacy
+
+
+<!-- /src/Ens/JobeetBundle/Resources/views/Job/new.html.twig -->
+{% extends 'EnsJobeetBundle::layout.html.twig' %}
+ 
+{% form_theme form _self %}
+ 
+{% block field_errors %}
+{% spaceless %}
+  {% if errors|length > 0 %}
+    <ul class="error_list">
+      {% for error in errors %}
+        <li>{{ error.messageTemplate|trans(error.messageParameters, 'validators') }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endspaceless %}
+{% endblock field_errors %}
+ 
+{% block stylesheets %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/job.css') }}" type="text/css" media="all" />
+{% endblock %}
+ 
+{% block content %}
+  <h1>Job creation</h1>
+  <form action="{{ path('ens_job_create') }}" method="post" {{ form_enctype(form) }}>
+    <table id="job_form">
+      <tfoot>
+        <tr>
+          <td colspan="2">
+            <input type="submit" value="Preview your job" />
+          </td>
+        </tr>
+      </tfoot>
+      <tbody>
+        <tr>
+          <th>{{ form_label(form.category) }}</th>
+          <td>
+            {{ form_errors(form.category) }}
+            {{ form_widget(form.category) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.type) }}</th>
+          <td>
+            {{ form_errors(form.type) }}
+            {{ form_widget(form.type) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.company) }}</th>
+          <td>
+            {{ form_errors(form.company) }}
+            {{ form_widget(form.company) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.file) }}</th>
+          <td>
+            {{ form_errors(form.file) }}
+            {{ form_widget(form.file) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.url) }}</th>
+          <td>
+            {{ form_errors(form.url) }}
+            {{ form_widget(form.url) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.position) }}</th>
+          <td>
+            {{ form_errors(form.position) }}
+            {{ form_widget(form.position) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.location) }}</th>
+          <td>
+            {{ form_errors(form.location) }}
+            {{ form_widget(form.location) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.description) }}</th>
+          <td>
+            {{ form_errors(form.description) }}
+            {{ form_widget(form.description) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.how_to_apply) }}</th>
+          <td>
+            {{ form_errors(form.how_to_apply) }}
+            {{ form_widget(form.how_to_apply) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.token) }}</th>
+          <td>
+            {{ form_errors(form.token) }}
+            {{ form_widget(form.token) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.is_public) }}</th>
+          <td>
+            {{ form_errors(form.is_public) }}
+            {{ form_widget(form.is_public) }}
+            <br /> Whether the job can also be published on affiliate websites or not.
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(form.email) }}</th>
+          <td>
+            {{ form_errors(form.email) }}
+            {{ form_widget(form.email) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+ 
+    {{ form_rest(form) }}
+  </form>
+{% endblock %}
+
+
+19.Podmieniamy kod formularza na nastêpujacy
+
+
+<!-- /src/Ens/JobeetBundle/Resources/views/Job/edit.html.twig -->
+{% extends 'EnsJobeetBundle::layout.html.twig' %}
+ 
+{% form_theme edit_form _self %}
+ 
+{% block field_errors %}
+{% spaceless %}
+  {% if errors|length > 0 %}
+    <ul>
+      {% for error in errors %}
+        <li>{{ error.messageTemplate|trans(error.messageParameters, 'validators') }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endspaceless %}
+{% endblock field_errors %}
+ 
+{% block stylesheets %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/job.css') }}" type="text/css" media="all" />
+{% endblock %}
+ 
+{% block content %}
+  <h1>Job edit</h1>
+  <form action="{{ path('ens_job_update', { 'id': entity.id }) }}" method="post" {{ form_enctype(edit_form) }}>
+    <table id="job_form">
+      <tfoot>
+        <tr>
+          <td colspan="2">
+            <input type="submit" value="Preview your job" />
+          </td>
+        </tr>
+      </tfoot>
+      <tbody>
+        <tr>
+          <th>{{ form_label(edit_form.category) }}</th>
+          <td>
+            {{ form_errors(edit_form.category) }}
+            {{ form_widget(edit_form.category) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.type) }}</th>
+          <td>
+            {{ form_errors(edit_form.type) }}
+            {{ form_widget(edit_form.type) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.company) }}</th>
+          <td>
+            {{ form_errors(edit_form.company) }}
+            {{ form_widget(edit_form.company) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.file) }}</th>
+          <td>
+            {{ form_errors(edit_form.file) }}
+            {{ form_widget(edit_form.file) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.url) }}</th>
+          <td>
+            {{ form_errors(edit_form.url) }}
+            {{ form_widget(edit_form.url) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.position) }}</th>
+          <td>
+            {{ form_errors(edit_form.position) }}
+            {{ form_widget(edit_form.position) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.location) }}</th>
+          <td>
+            {{ form_errors(edit_form.location) }}
+            {{ form_widget(edit_form.location) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.description) }}</th>
+          <td>
+            {{ form_errors(edit_form.description) }}
+            {{ form_widget(edit_form.description) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.how_to_apply) }}</th>
+          <td>
+            {{ form_errors(edit_form.how_to_apply) }}
+            {{ form_widget(edit_form.how_to_apply) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.token) }}</th>
+          <td>
+            {{ form_errors(edit_form.token) }}
+            {{ form_widget(edit_form.token) }}
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.is_public) }}</th>
+          <td>
+            {{ form_errors(edit_form.is_public) }}
+            {{ form_widget(edit_form.is_public) }}
+            <br /> Whether the job can also be published on affiliate websites or not.
+          </td>
+        </tr>
+        <tr>
+          <th>{{ form_label(edit_form.email) }}</th>
+          <td>
+            {{ form_errors(edit_form.email) }}
+            {{ form_widget(edit_form.email) }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+ 
+    {{ form_rest(edit_form) }}
+  </form>
+{% endblock %}
+
+/**************************************************************************/
+
+The Form Action
+
+20. Wstawianie domyœlnej wartoœci Type podczas tworzenia nowej oferty:
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function newAction()
+{
+  $entity = new Job();
+  $entity->setType('full-time');
+  $form   = $this->createForm(new JobType(), $entity);
+ 
+  return $this->render('EnsJobeetBundle:Job:new.html.twig', array(
+    'entity' => $entity,
+    'form'   => $form->createView()
+  ));
+}
+
+
+21. Protecting the Job Form with a Token - wystawianie tokiena.
+Dodajemy now¹ metodê:
+
+// src/Ens/JobeetBundle/Entity/Job.php
+// ...
+ 
+public function setTokenValue()
+{
+  if(!$this->getToken())
+  {
+    $this->token = sha1($this->getEmail().rand(11111, 99999));
+  }
+}
+ 
+// ...
+
+22.Dodanie nowych metod
+
+# src/End/JobeetBundle/Resources/config/doctrine/Job.orm.yml
+# ...
+ 
+  lifecycleCallbacks:
+    prePersist: [ setTokenValue, preUpload, setCreatedAtValue, setExpiresAtValue ]
+    # ...
+
+23.
+
+php app/console doctrine:generate:entities EnsJobeetBundle
+
+24. Usuwamy token z formularza
+
+// src/Ens/JobeetBundle/Form/JobType.php
+// ...
+ 
+public function buildForm(FormBuilder $builder, array $options)
+{
+    $builder->add('category');
+    $builder->add('type', 'choice', array('choices' => Job::getTypes(), 'expanded' => true));
+    $builder->add('company');
+    $builder->add('file', 'file', array('label' => 'Company logo', 'required' => false));
+    $builder->add('url');
+    $builder->add('position');
+    $builder->add('location');
+    $builder->add('description');
+    $builder->add('how_to_apply', null, array('label' => 'How to apply?'));
+    $builder->add('is_public', null, array('label' => 'Public?'));
+    $builder->add('email');
+}
+
+25. Usuwamy tokeny z formularzy
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/new.html/twig -->
+<tr>
+  <th>{{ form_label(form.token) }}</th>
+  <td>
+    {{ form_errors(form.token) }}
+    {{ form_widget(form.token) }}
+  </td>
+</tr>
+ 
+<!-- src/Ens/JobeetBundle/Resources/views/Job/edit.html/twig -->
+<tr>
+  <th>{{ form_label(edit_form.token) }}</th>
+  <td>
+    {{ form_errors(edit_form.token) }}
+    {{ form_widget(edit_form.token) }}
+  </td>
+</tr>
+
+26. Usuwamy z walidatora formularza wpis
+
+# src/End/JobeetBundle/Resources/config/validation.yml
+
+token:
+    - NotBlank: ~
+
+
+
+
+27. Podmiana adresow URL
+
+# src/End/JobeetBundle/Resources/config/routing/job.yml
+# ...
+ 
+ens_job_edit:
+    pattern:  /{token}/edit
+    defaults: { _controller: "EnsJobeetBundle:Job:edit" }
+ 
+ens_job_update:
+    pattern:  /{token}/update
+    defaults: { _controller: "EnsJobeetBundle:Job:update" }
+    requirements: { _method: post }
+ 
+ens_job_delete:
+    pattern:  /{token}/delete
+    defaults: { _controller: "EnsJobeetBundle:Job:delete" }
+    requirements: { _method: post }
+
+27. dostosowanie metod pod nowe adresy URL zmiana zmiennej $id na $token
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function editAction($token)
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $entity = $em->getRepository('EnsJobeetBundle:Job')->findOneByToken($token);
+ 
+  if (!$entity) {
+    throw $this->createNotFoundException('Unable to find Job entity.');
+  }
+ 
+  $editForm = $this->createForm(new JobType(), $entity);
+  $deleteForm = $this->createDeleteForm($token);
+ 
+  return $this->render('EnsJobeetBundle:Job:edit.html.twig', array(
+    'entity'      => $entity,
+    'edit_form'   => $editForm->createView(),
+    'delete_form' => $deleteForm->createView(),
+  ));
+}
+ 
+public function updateAction($token)
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $entity = $em->getRepository('EnsJobeetBundle:Job')->findOneByToken($token);
+ 
+  if (!$entity) {
+    throw $this->createNotFoundException('Unable to find Job entity.');
+  }
+ 
+  $editForm   = $this->createForm(new JobType(), $entity);
+  $deleteForm = $this->createDeleteForm($token);
+ 
+  $request = $this->getRequest();
+ 
+  $editForm->bindRequest($request);
+ 
+  if ($editForm->isValid()) {
+    $em->persist($entity);
+    $em->flush();
+ 
+    return $this->redirect($this->generateUrl('ens_job_edit', array('token' => $token)));
+  }
+ 
+  return $this->render('EnsJobeetBundle:Job:edit.html.twig', array(
+    'entity'      => $entity,
+    'edit_form'   => $editForm->createView(),
+    'delete_form' => $deleteForm->createView(),
+  ));
+}
+ 
+public function deleteAction($token)
+{
+  $form = $this->createDeleteForm($token);
+  $request = $this->getRequest();
+ 
+  $form->bindRequest($request);
+ 
+  if ($form->isValid()) {
+    $em = $this->getDoctrine()->getEntityManager();
+    $entity = $em->getRepository('EnsJobeetBundle:Job')->findOneByToken($token);
+ 
+    if (!$entity) {
+      throw $this->createNotFoundException('Unable to find Job entity.');
+    }
+ 
+    $em->remove($entity);
+    $em->flush();
+  }
+ 
+  return $this->redirect($this->generateUrl('ens_job'));
+}
+ 
+private function createDeleteForm($token)
+{
+  return $this->createFormBuilder(array('token' => $token))
+    ->add('token', 'hidden')
+    ->getForm()
+  ;
+}
+
+28. Zmiana linkow w template
+
+src\Ens\JobeetBundle\Resources\views\Job\show.html.twig
+
+<a href="{{ path('ens_job_edit', { 'id': entity.id }) }}">
+
+src\Ens\JobeetBundle\Resources\views\Job\edit.html.twig
+
+<form action="{{ path('ens_job_update', { 'token': entity.token }) }}" method="post" {{ form_enctype(edit_form) }}>
+
+30.Strona podgladu oferty dostêpna za pomoc¹ tokenu
+
+
+# src/End/JobeetBundle/Resources/config/routing/job.yml
+# ...
+ 
+ens_job_show:
+    pattern:  /{company}/{location}/{id}/{position}
+    defaults: { _controller: "EnsJobeetBundle:Job:show" }
+    requirements:
+        id:  \d+
+ 
+ens_job_preview:
+    pattern:  /{company}/{location}/{token}/{position}
+    defaults: { _controller: "EnsJobeetBundle:Job:preview" }
+    requirements:
+        token:  \w+
+
+31. Pobranie oferty z bazy danych
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function previewAction($token)
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $entity = $em->getRepository('EnsJobeetBundle:Job')->findOneByToken($token);
+ 
+  if (!$entity) {
+    throw $this->createNotFoundException('Unable to find Job entity.');
+  }
+ 
+  $deleteForm = $this->createDeleteForm($entity->getId());
+ 
+  return $this->render('EnsJobeetBundle:Job:show.html.twig', array(
+    'entity'      => $entity,
+    'delete_form' => $deleteForm->createView(),
+  ));
+}
+ 
+// ...
+
+32. Dodanie paska admina dla ofery
+
+<!-- /src/Ens/JobeetBundle/Resources/views/Job/show.html.twig -->
+<!-- ... -->
+ 
+{% block content %}
+  {% if app.request.get('token') %}
+    {% include 'EnsJobeetBundle:Job:admin.html.twig' with {'job': entity} %}
+  {% endif %}
+ 
+  <!-- ... -->
+ 
+{% endblock %}
+
+33. Panel amina
+
+<!-- /src/Ens/JobeetBundle/Resources/views/Job/admin.html.twig -->
+ 
+<div id="job_actions">
+  <h3>Admin</h3>
+  <ul>
+    {% if not job.isActivated %}
+      <li><a href="{{ path('ens_job_edit', { 'token': job.token }) }}">Edit</a></li>
+      <li><a href="{{ path('ens_job_edit', { 'token': job.token }) }}">Publish</a></li>
+    {% endif %}
+    <li>
+      <form action="{{ path('ens_job_delete', { 'token': job.token }) }}" method="post">
+        {{ form_widget(delete_form) }}
+        <button type="submit" onclick="if(!confirm('Are you sure?')) { return false; }">Delete</button>
+      </form>
+    </li>
+    {% if job.isActivated %}
+      <li {% if job.expiresSoon %} class="expires_soon" {% endif %}>
+        {% if job.isExpired %}
+          Expired
+        {% else %}
+          Expires in <strong>{{ job.getDaysBeforeExpires }}</strong> days
+        {% endif %}
+ 
+        {% if job.expiresSoon %}
+          - <a href="">Extend</a> for another 30 days
+        {% endif %}
+      </li>
+    {% else %}
+      <li>
+        [Bookmark this <a href="{{ url('ens_job_preview', { 'token': job.token, 'company': job.companyslug, 'location': job.locationslug, 'position': job.positionslug }) }}">URL</a> to manage this job in the future.]
+      </li>
+    {% endif %}
+  </ul>
+</div>
+
+34.Metody menu admina
+
+// src/Ens/JobeetBundle/Entity/Job.php
+// ...
+ 
+public function isExpired()
+{
+  return $this->getDaysBeforeExpires() < 0;
+}
+ 
+public function expiresSoon()
+{
+  return $this->getDaysBeforeExpires() < 5;
+}
+ 
+public function getDaysBeforeExpires()
+{
+  return ceil(($this->getExpiresAt()->format('U') - time()) / 86400);
+}
+
+
+35. Modyfikacje kontrolerów
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+
+public function createAction()
+{
+  // ...
+ 
+  if ($form->isValid()) {
+    // ...
+ 
+    return $this->redirect($this->generateUrl('ens_job_preview', array(
+      'company' => $entity->getCompanySlug(),
+      'location' => $entity->getLocationSlug(),
+      'token' => $entity->getToken(),
+      'position' => $entity->getPositionSlug()
+    )));
+  }
+ 
+  // ...
+}
+ 
+public function updateAction($token)
+{
+  // ...
+ 
+  if ($editForm->isValid()) {
+    // ...
+ 
+    return $this->redirect($this->generateUrl('ens_job_preview', array(
+      'company' => $entity->getCompanySlug(),
+      'location' => $entity->getLocationSlug(),
+      'token' => $entity->getToken(),
+      'position' => $entity->getPositionSlug()
+    )));
+  }
+ 
+  // ...
+}
+
+
+Przyk³ad edycji oferty z panelem admin:
+
+http://jobeet2.localhost/app_dev.php/job/ccccccccccc/ccccccc/71/cccccccccc
+id zastêpujemy tokienem
+http://jobeet2.localhost/app_dev.php/job/ccccccccccc/ccccccc/b148321f3f2205ddd74c4faef484995d001dfc37/cccccccccc
+
+
+36. Job Activation and Publication - aktywacja i publikacja nowej oferty
+
+# src/Ens/JobeetBundle/Resources/config/routing/job.yml
+# ...
+ 
+ens_job_publish:
+    pattern:  /{token}/publish
+    defaults: { _controller: "EnsJobeetBundle:Job:publish" }
+    requirements: { _method: post }
+
+37. Zmiana w template
+<!-- src/Ens/JobeetBundle/Resources/views/job/admin.html.twig -->
+<!-- ... -->
+ 
+{% if not job.isActivated %}
+  <li><a href="{{ path('ens_job_edit', { 'token': job.token }) }}">Edit</a></li>
+  <li>
+    <form action="{{ path('ens_job_publish', { 'token': job.token }) }}" method="post">
+      {{ form_widget(publish_form) }}
+      <button type="submit">Publish</button>
+    </form>
+  </li>
+{% endif %}
+ 
+<!-- ... -->
+
+38. zmiana metod
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function previewAction($token)
+{
+  // ...
+ 
+  $deleteForm = $this->createDeleteForm($entity->getId());
+  $publishForm = $this->createPublishForm($entity->getToken());
+ 
+  return $this->render('EnsJobeetBundle:Job:show.html.twig', array(
+    'entity'      => $entity,
+    'delete_form' => $deleteForm->createView(),
+    'publish_form' => $publishForm->createView(),
+  ));
+}
+ 
+public function publishAction($token)
+{
+  $form = $this->createPublishForm($token);
+  $request = $this->getRequest();
+ 
+  $form->bindRequest($request);
+ 
+  if ($form->isValid()) {
+    $em = $this->getDoctrine()->getEntityManager();
+    $entity = $em->getRepository('EnsJobeetBundle:Job')->findOneByToken($token);
+ 
+    if (!$entity) {
+      throw $this->createNotFoundException('Unable to find Job entity.');
+    }
+ 
+    $entity->publish();
+    $em->persist($entity);
+    $em->flush();
+ 
+    $this->get('session')->setFlash('notice', 'Your job is now online for 30 days.');
+  }
+ 
+  return $this->redirect($this->generateUrl('ens_job_preview', array(
+    'company' => $entity->getCompanySlug(),
+    'location' => $entity->getLocationSlug(),
+    'token' => $entity->getToken(),
+    'position' => $entity->getPositionSlug()
+  )));
+}
+ 
+private function createPublishForm($token)
+{
+  return $this->createFormBuilder(array('token' => $token))
+    ->add('token', 'hidden')
+    ->getForm()
+  ;
+}
+ 
+// ...
+
+39. dodanie metody
+
+// src/Ens/JobeetBundle/Entity/Job.php
+// ...
+ 
+public function publish()
+{
+  $this->setIsActivated(true);
+}
+ 
+// ...
+
+
+40. Oderty nieaktywowane niedostêpne przez adres URL
+
+// src Ens/JobeetBundle/Repository/JobRepository.php
+ 
+namespace Ens\JobeetBundle\Repository;
+use Doctrine\ORM\EntityRepository;
+ 
+class JobRepository extends EntityRepository
+{
+  public function getActiveJobs($category_id = null, $max = null, $offset = null)
+  {
+    $qb = $this->createQueryBuilder('j')
+    ->where('j.expires_at > :date')
+    ->setParameter('date', date('Y-m-d H:i:s', time()))
+    ->andWhere('j.is_activated = :activated')
+    ->setParameter('activated', 1)
+    ->orderBy('j.expires_at', 'DESC');
+ 
+    if($max)
+    {
+      $qb->setMaxResults($max);
+    }
+ 
+    if($offset)
+    {
+      $qb->setFirstResult($offset);
+    }
+ 
+    if($category_id)
+    {
+      $qb->andWhere('j.category = :category_id')
+        ->setParameter('category_id', $category_id);
+    }
+ 
+    $query = $qb->getQuery();
+ 
+    return $query->getResult();
+  }
+ 
+  public function countActiveJobs($category_id = null)
+  {
+    $qb = $this->createQueryBuilder('j')
+    ->select('count(j.id)')
+    ->where('j.expires_at > :date')
+    ->setParameter('date', date('Y-m-d H:i:s', time()))
+    ->andWhere('j.is_activated = :activated')
+    ->setParameter('activated', 1);
+ 
+    if($category_id)
+    {
+      $qb->andWhere('j.category = :category_id')
+        ->setParameter('category_id', $category_id);
+    }
+ 
+    $query = $qb->getQuery();
+ 
+    return $query->getSingleScalarResult();
+  }
+ 
+  public function getActiveJob($id)
+  {
+    $query = $this->createQueryBuilder('j')
+      ->where('j.id = :id')
+      ->setParameter('id', $id)
+      ->andWhere('j.expires_at > :date')
+      ->setParameter('date', date('Y-m-d H:i:s', time()))
+      ->andWhere('j.is_activated = :activated')
+      ->setParameter('activated', 1)
+      ->setMaxResults(1)
+      ->getQuery();
+ 
+    try {
+      $job = $query->getSingleResult();
+    } catch (\Doctrine\Orm\NoResultException $e) {
+      $job = null;
+    }
+ 
+    return $job;
+  }
+}
+
+
+
+// src/Ens/JobeetBundle/Repository/CategoryRepository.php
+ 
+namespace Ens\JobeetBundle\Repository;
+use Doctrine\ORM\EntityRepository;
+ 
+class CategoryRepository extends EntityRepository
+{
+  public function getWithJobs()
+  {
+    $query = $this->getEntityManager()->createQuery(
+      'SELECT c FROM EnsJobeetBundle:Category c LEFT JOIN c.jobs j WHERE j.expires_at > :date AND j.is_activated = :activated'
+    )->setParameter('date', date('Y-m-d H:i:s', time()))->setParameter('activated', 1);
+ 
+    return $query->getResult();
+  }
+}
+
+
+
+
+

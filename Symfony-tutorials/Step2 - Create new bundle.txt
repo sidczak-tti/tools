@@ -1,0 +1,55 @@
+1.	php app/console generate:bundle --namespace=Ens/JobeetBundle --format=yml
+
+	Odpowiedzi na pytania:
+
+ Bundle namespace [Ens/JobeetBundle]: Ens/JobeetBundle
+ Bundle name [EnsJobeetBundle]: EnsJobeetBundle
+ Target directory [/home/dragos/work/jobeet/src]: /home/dragos/work/jobeet/src <- Linux
+ Target directory [C:/sf2_tutorials/jobeet2/src]: C:/sf2_tutorials/jobeet2/src
+ Configuration format (yml, xml, php, or annotation) [yml]: yml
+ Do you want to generate the whole directory structure [no]? yes <- !!!
+ Do you confirm generation [yes]? yes
+ Confirm automatic update of your Kernel [yes]? yes
+ Confirm automatic update of the Routing [yes]? yes
+
+2.	jobeet2/app/AppKernel.php
+
+
+        $bundles = array(
+            
+		...           
+		new Ens\JobeetBundle\EnsJobeetBundle(),
+        
+	);
+
+3.	jobeet2/app/autoload.php <- opcjonalnie
+
+	$loader->registerNamespaces(array(
+
+		...	
+		//'Ens'              => __DIR__.'/../src',
+	
+));
+
+4.	jobeet2/app/config/routing.yml
+	
+	EnsJobeetBundle:
+		resource: "@EnsJobeetBundle/Resources/config/routing.yml"
+		prefix:   /
+
+5.	Czyszczenie cache:
+
+	php app/console cache:clear --env=prod
+	php app/console cache:clear --env=dev
+
+6.	Podgl¹d nowej strony:
+
+
+	http://jobeet2.localhost/app.php/hello/jobeet
+	http://jobeet2.localhost/app_dev.php/hello/jobeet
+
+
+	C:/wamp/bin/apache/Apache2.2.17/conf/httpd.conf
+	LoadModule rewrite_module modules/mod_rewrite.so <- odkomentowaæ
+	
+	http://jobeet2.localhost/hello/jobeet

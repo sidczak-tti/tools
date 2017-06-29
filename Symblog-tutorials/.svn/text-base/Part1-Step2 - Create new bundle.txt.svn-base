@@ -1,0 +1,83 @@
+1.	php app/console generate:bundle --namespace=Blogger/BlogBundle --format=yml
+	php app/console generate:bundle --namespace=Application/PersonalBundle --format=yml
+
+	Odpowiedzi na pytania:
+
+ Bundle namespace [Blogger/BlogBundle]: Blogger/BlogBundle
+ Bundle name [BloggerBlogBundle]: BloggerBlogBundle
+ Target directory [/home/dragos/work/jobeet/src]: /home/dragos/work/jobeet/src <- Linux
+ Target directory [C:/sf2_tutorials/symblog/src]: C:/sf2_tutorials/symblog/src
+ Configuration format (yml, xml, php, or annotation) [yml]: yml
+ Do you want to generate the whole directory structure [no]? yes <- !!!
+ Do you confirm generation [yes]? yes
+ Confirm automatic update of your Kernel [yes]? yes
+ Confirm automatic update of the Routing [yes]? yes
+
+2.	symblog/app/AppKernel.php - do pliku zostaje wprowadzony nastêpuj¹cy wpis
+
+
+        $bundles = array(
+            
+		...           
+		new Blogger\BlogBundle\BloggerBlogBundle(),
+        
+	);
+
+3.	symblog/app/autoload.php <- opcjonalnie
+
+	$loader->registerNamespaces(array(
+
+		...	
+		//'Blogger'              => __DIR__.'/../src',
+	
+));
+
+4.	symblog/app/config/routing.yml
+	
+	BloggerBlogBundle:
+		resource: "@BloggerBlogBundle/Resources/config/routing.yml"
+		prefix:   /
+
+# src/Blogger/BlogBundle/Resources/config/routing.yml
+BloggerBlogBundle_homepage:
+    pattern:  /hello/{name}
+    defaults: { _controller: BloggerBlogBundle:Default:index }
+
+5.	Czyszczenie cache:
+
+	php app/console cache:clear --env=prod
+	php app/console cache:clear --env=dev
+
+6.	Podgl¹d nowej strony:
+
+
+	http://symblog.localhost/app.php/hello/symblog
+	http://symblog.localhost/app_dev.php/hello/symblog
+
+
+	C:/wamp/bin/apache/Apache2.2.17/conf/httpd.conf
+	LoadModule rewrite_module modules/mod_rewrite.so <- odkomentowaæ
+	
+	http://symblog.localhost/hello/symblog
+
+7.	Kontroler
+
+	<?php
+
+	// src/Blogger/BlogBundle/Controller/DefaultController.php
+
+	namespace Blogger\BlogBundle\Controller;
+
+	use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+
+	class DefaultController extends Controller
+	{
+	    public function indexAction($name)
+	    {
+	        return $this->render('BloggerBlogBundle:Default:index.html.twig', array('name' => $name));
+	    }
+	}
+
+8.	Template
+	{# src/Blogger/BlogBundle/Resources/views/Default/index.html.twig #}
+	Hello {{ name }}!

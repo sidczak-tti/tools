@@ -1,0 +1,288 @@
+1.
+
+<?php
+// src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php
+
+namespace Blogger\BlogBundle\Tests\Controller;
+
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+
+class PageControllerTest extends WebTestCase
+{
+    public function testAbout()
+    {
+        $client = static::createClient();
+
+        $crawler = $client->request('GET', '/about');
+
+        $this->assertEquals(1, $crawler->filter('h1:contains("About symblog")')->count());
+    }
+}
+
+2. W³aczony serwer wamp
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Controller\PageControllerTest.php - WIN
+
+$ phpunit -c app/ src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php - GIT
+
+3. Homepage
+
+// src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php
+
+public function testIndex()
+{
+    $client = static::createClient();
+
+    $crawler = $client->request('GET', '/');
+
+    // Check there are some blog entries on the page
+    $this->assertTrue($crawler->filter('article.blog')->count() > 0);
+}
+
+4.
+
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Controller\PageControllerTest.php - WIN
+
+$ phpunit -c app/ src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php - GIT
+
+5.
+
+// src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php
+
+public function testIndex()
+{
+    // ..
+
+    // Find the first link, get the title, ensure this is loaded on the next page
+    $blogLink   = $crawler->filter('article.blog h2 a')->first();
+    $blogTitle  = $blogLink->text();
+    $crawler    = $client->click($blogLink->link());
+
+    // Check the h2 has the blog title in it
+    $this->assertEquals(1, $crawler->filter('h2:contains("' . $blogTitle .'")')->count());
+}
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Controller\PageControllerTest.php - WIN
+$ phpunit -c app/ src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php - GIT
+
+6. Testing the Contact Page
+
+// src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php
+
+public function testContact()
+{
+    $client = static::createClient();
+
+    $crawler = $client->request('GET', '/contact');
+
+    $this->assertEquals(1, $crawler->filter('h1:contains("Contact symblog")')->count());
+
+    // Select based on button value, or id or name for buttons
+    $form = $crawler->selectButton('Submit')->form();
+
+    $form['contact[name]']       = 'name';
+    $form['contact[email]']      = 'email@email.com';
+    $form['contact[subject]']    = 'Subject';
+    $form['contact[body]']       = 'The comment body must be at least 50 characters long as there is a validation constrain on the Enquiry entity';
+
+    $crawler = $client->submit($form);
+
+    $this->assertEquals(1, $crawler->filter('.blogger-notice:contains("Your contact enquiry was successfully sent. Thank you!")')->count());
+}
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Controller\PageControllerTest.php - WIN
+$ phpunit -c app/ src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php - GIT
+
+7.
+
+// src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php
+
+public function testContact()
+{
+    // ..
+
+    $crawler = $client->submit($form);
+
+    // Need to follow redirect
+    $crawler = $client->followRedirect();
+
+    $this->assertEquals(1, $crawler->filter('.blogger-notice:contains("Your contact enquiry was successfully sent. Thank you!")')->count());
+}
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Controller\PageControllerTest.php - WIN
+$ phpunit -c app/ src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php - GIT
+
+8.
+
+// src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php
+
+public function testContact()
+{
+    // ..
+
+    $crawler = $client->submit($form);
+
+    // Check email has been sent
+    if ($profile = $client->getProfile())
+    {
+        $swiftMailerProfiler = $profile->getCollector('swiftmailer');
+
+        // Only 1 message should have been sent
+        $this->assertEquals(1, $swiftMailerProfiler->getMessageCount());
+
+        // Get the first message
+        $messages = $swiftMailerProfiler->getMessages();
+        $message  = array_shift($messages);
+
+        $symblogEmail = $client->getContainer()->getParameter('blogger_blog.emails.contact_email');
+        // Check message is being sent to correct address
+        $this->assertArrayHasKey($symblogEmail, $message->getTo());
+    }
+
+    // Need to follow redirect
+    $crawler = $client->followRedirect();
+
+    $this->assertTrue($crawler->filter('.blogger-notice:contains("Your contact enquiry was successfully sent. Thank you!")')->count() > 0);
+}
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Controller\PageControllerTest.php - WIN
+$ phpunit -c app/ src/Blogger/BlogBundle/Tests/Controller/PageControllerTest.php - GIT
+
+9. Testing Adding Blog Comments
+
+<?php
+// src/Blogger/BlogBundle/Tests/Controller/BlogControllerTest.php
+
+namespace Blogger\BlogBundle\Tests\Controller;
+
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+
+class BlogControllerTest extends WebTestCase
+{
+    public function testAddBlogComment()
+    {
+        $client = static::createClient();
+
+        $crawler = $client->request('GET', '/1/a-day-with-symfony2');
+
+        $this->assertEquals(1, $crawler->filter('h2:contains("A day with Symfony2")')->count());
+
+        // Select based on button value, or id or name for buttons
+        $form = $crawler->selectButton('Submit')->form();
+
+        $crawler = $client->submit($form, array(
+            'blogger_blogbundle_commenttype[user]'          => 'name',
+            'blogger_blogbundle_commenttype[comment]'       => 'comment',
+        ));
+
+        // Need to follow redirect
+        $crawler = $client->followRedirect();
+
+        // Check comment is now displaying on page, as the last entry. This ensure comments
+        // are posted in order of oldest to newest
+        $articleCrawler = $crawler->filter('section .previous-comments article')->last();
+
+        $this->assertEquals('name', $articleCrawler->filter('header span.highlight')->text());
+        $this->assertEquals('comment', $articleCrawler->filter('p')->last()->text());
+
+        // Check the sidebar to ensure latest comments are display and there is 10 of them
+
+        $this->assertEquals(10, $crawler->filter('aside.sidebar section')->last()
+                                        ->filter('article')->count()
+        );
+
+        $this->assertEquals('name', $crawler->filter('aside.sidebar section')->last()
+                                            ->filter('article')->first()
+                                            ->filter('header span.highlight')->text()
+        );
+    }
+}
+
+//$crawler = $client->request('GET', '/1/a-day-with-symfony2'); <- id numeru z bazy
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Controller\BlogControllerTest.php - WIN
+$ phpunit -c app src/Blogger/BlogBundle/Tests/Controller/BlogControllerTest.php - GIT
+
+10. Blog Repository
+
+<?php
+// src/Blogger/BlogBundle/Tests/Repository/BlogRepositoryTest.php
+
+namespace Blogger\BlogBundle\Tests\Repository;
+
+use Blogger\BlogBundle\Repository\BlogRepository;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+
+class BlogRepositoryTest extends WebTestCase
+{
+    /**
+     * @var \Blogger\BlogBundle\Repository\BlogRepository
+     */
+    private $blogRepository;
+
+    public function setUp()
+    {
+        $kernel = static::createKernel();
+        $kernel->boot();
+        $this->blogRepository = $kernel->getContainer()
+                                       ->get('doctrine.orm.entity_manager')
+                                       ->getRepository('BloggerBlogBundle:Blog');
+    }
+
+    public function testGetTags()
+    {
+        $tags = $this->blogRepository->getTags();
+
+        $this->assertTrue(count($tags) > 1);
+        $this->assertContains('symblog', $tags);
+    }
+
+    public function testGetTagWeights()
+    {
+        $tagsWeight = $this->blogRepository->getTagWeights(
+            array('php', 'code', 'code', 'symblog', 'blog')
+        );
+
+        $this->assertTrue(count($tagsWeight) > 1);
+
+        // Test case where count is over max weight of 5
+        $tagsWeight = $this->blogRepository->getTagWeights(
+            array_fill(0, 10, 'php')
+        );
+
+        $this->assertTrue(count($tagsWeight) >= 1);
+
+        // Test case with multiple counts over max weight of 5
+        $tagsWeight = $this->blogRepository->getTagWeights(
+            array_merge(array_fill(0, 10, 'php'), array_fill(0, 2, 'html'), array_fill(0, 6, 'js'))
+        );
+
+        $this->assertEquals(5, $tagsWeight['php']);
+        $this->assertEquals(3, $tagsWeight['js']);
+        $this->assertEquals(1, $tagsWeight['html']);
+
+        // Test empty case
+        $tagsWeight = $this->blogRepository->getTagWeights(array());
+
+        $this->assertEmpty($tagsWeight);
+    }
+}
+
+$ phpunit -c app src\Blogger\BlogBundle\Tests\Repository\BlogRepositoryTest.php - WIN
+$ phpunit -c app src/Blogger/BlogBundle/Tests/Repository/BlogRepositoryTest.php - GIT
+
+
+
+11. Pokrycie kodu testami
+
+$ phpunit --coverage-html ./phpunit-report -c app/
+
+W katalogu
+C:\sf2_tutorials\symblog\phpunit-report
+mamy pliki pokazuj¹ce stopieñ pokrycia kodu testami
+
+
+
+
+

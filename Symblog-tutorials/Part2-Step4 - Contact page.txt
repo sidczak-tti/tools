@@ -1,0 +1,74 @@
+1.	Routing
+
+# src/Blogger/BlogBundle/Resources/config/routing.yml
+BloggerBlogBundle_contact:
+    pattern:  /contact
+    defaults: { _controller: BloggerBlogBundle:Page:contact }
+    requirements:
+        _method:  GET
+
+BloggerBlogBundle_about:
+    pattern:  /about
+    defaults: { _controller: BloggerBlogBundle:Page:about }
+    requirements:
+        _method:  GET
+
+2.	Controller
+
+// src/Blogger/BlogBundle/Controller/PageController.php
+// ..
+public function contactAction()
+{
+    return $this->render('BloggerBlogBundle:Page:contact.html.twig');
+}
+
+public function aboutAction()
+{
+	return $this->render('BloggerBlogBundle:Page:about.html.twig');
+}
+// ..
+
+
+3. View
+
+{# src/Blogger/BlogBundle/Resources/views/Page/contact.html.twig #}
+{% extends 'BloggerBlogBundle::layout.html.twig' %}
+
+{% block title %}Contact{% endblock%}
+
+{% block body %}
+    <header>
+        <h1>Contact symblog</h1>
+    </header>
+
+    <p>Want to contact symblog?</p>
+{% endblock %}
+
+{# src/Blogger/BlogBundle/Resources/views/Page/about.html.twig #}
+{% extends 'BloggerBlogBundle::layout.html.twig' %}
+
+{% block title %}About{% endblock%}
+
+{% block body %}
+    <header>
+        <h1>About symblog</h1>
+    </header>
+
+    <p>Want to aboutsymblog?</p>
+{% endblock %}
+
+
+4.	Linking to the page
+
+Lastly we need to update the link in the application template located at app/Resources/views/base.html.twig to link to the contact page.
+<!-- app/Resources/views/base.html.twig -->
+{% block navigation %}
+    <nav>
+        <ul class="navigation">
+            <li><a href="{{ path('BloggerBlogBundle_homepage') }}">Home</a></li>
+            <li><a href="{{ path('BloggerBlogBundle_about') }}">About</a></li>
+            <li><a href="{{ path('BloggerBlogBundle_contact') }}">Contact</a></li>
+        </ul>
+    </nav>
+{% endblock %}
+

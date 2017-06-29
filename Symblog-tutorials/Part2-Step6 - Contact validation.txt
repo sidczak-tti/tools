@@ -1,0 +1,154 @@
+1.	Dodanie validatora
+
+<?php
+// src/Blogger/BlogBundle/Entity/Enquiry.php
+
+namespace Blogger\BlogBundle\Entity;
+
+use Symfony\Component\Validator\Mapping\ClassMetadata;
+use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\Email;
+use Symfony\Component\Validator\Constraints\MinLength;
+use Symfony\Component\Validator\Constraints\MaxLength;
+
+class Enquiry
+{
+    // ..
+
+    public static function loadValidatorMetadata(ClassMetadata $metadata)
+    {
+        $metadata->addPropertyConstraint('name', new NotBlank());
+
+        $metadata->addPropertyConstraint('email', new Email());
+
+        $metadata->addPropertyConstraint('subject', new NotBlank());
+        $metadata->addPropertyConstraint('subject', new MaxLength(50));
+
+        $metadata->addPropertyConstraint('body', new MinLength(50));
+    }
+
+    // ..
+
+}
+
+2.
+
+$metadata->addPropertyConstraint('email', new Email(array(
+    'message' => 'symblog does not like invalid emails. Give me a real one!'
+)));
+Aby dzia³a³y walidatory serwera trzeba od³aczyæ walidatory HTML5
+
+3.	Konfiguracja Swift Mailer
+
+#app/config/parameters.ini 
+
+mailer_transport="gmail"
+mailer_encryption="ssl"
+mailer_auth_mode="login"
+mailer_host="smtp.gmail.com"
+mailer_user="your_username"
+mailer_password="your_password"
+
+example.
+
+    mailer_transport="gmail"
+    mailer_encryption="ssl"
+    //mailer_auth_mode="login"
+    mailer_host="smtp.gmail.com"
+    mailer_user="szymon.idczak@gmail.com"
+    mailer_password="has³o do poczty gmail"
+
+php.ini <- zdejmujemy komentarz
+extension=php_openssl.dll
+
+4. Update kontroler
+
+// src/Blogger/BlogBundle/Controller/PageController.php
+
+public function contactAction()
+{
+    // ..
+    if ($form->isValid()) {
+		
+	$message = \Swift_Message::newInstance()
+		->setSubject('Contact enquiry from symblog')
+		->setFrom('szymon.idczak@gmail.com')
+		->setTo('szymon.idczak@gmail.com')
+		->setBody($this->renderView('BloggerBlogBundle:Page:contactEmail.txt.twig', array('enquiry' => $enquiry)));
+	$this->get('mailer')->send($message);
+		
+	$this->get('session')->setFlash('blogger-notice', 'Your contact enquiry was successfully sent. Thank you!');
+		
+	// Redirect - This is important to prevent users re-posting
+	// the form if they refresh the page
+	return $this->redirect($this->generateUrl('BloggerBlogBundle_contact'));
+    }
+    // ..
+}
+
+5.
+
+{# src/Blogger/BlogBundle/Resources/views/Page/contact.html.twig #}
+
+{# rest of template ... #}
+<header>
+    <h1>Contact symblog</h1>
+</header>
+
+{% if app.session.hasFlash('blogger-notice') %}
+    <div class="blogger-notice">
+        {{ app.session.flash('blogger-notice') }}
+    </div>
+{% endif %}
+
+<p>Want to contact symblog?</p>
+
+{# rest of template ... #}
+
+6.
+# src/Blogger/BlogBundle/Resources/config/config.yml
+parameters:
+    # Blogger contact email address
+    #blogger_blog.emails.contact_email: contact@email.com
+    blogger_blog.emails.contact_email: szymon.idczak@gmail.com
+
+# app/config/config.yml
+imports:
+    # .. existing import here
+    - { resource: @BloggerBlogBundle/Resources/config/config.yml }
+
+7.
+
+// src/Blogger/BlogBundle/Controller/PageController.php
+
+public function contactAction()
+{
+    // ..
+    if ($form->isValid()) {
+
+        $message = \Swift_Message::newInstance()
+            ->setSubject('Contact enquiry from symblog')
+            ->setFrom('szymon.idczak@gmail.com')
+            ->setTo($this->container->getParameter('blogger_blog.emails.contact_email'))
+            ->setBody($this->renderView('BloggerBlogBundle:Page:contactEmail.txt.twig', array('enquiry' => $enquiry)));
+
+	$this->get('mailer')->send($message);
+		
+	$this->get('session')->setFlash('blogger-notice', 'Your contact enquiry was successfully sent. Thank you!');
+		
+	// Redirect - This is important to prevent users re-posting
+	// the form if they refresh the page
+	return $this->redirect($this->generateUrl('BloggerBlogBundle_contact'));
+    }
+    // ..
+}
+
+8.
+
+{# src/Blogger/BlogBundle/Resources/views/Page/contactEmail.txt.twig #}
+A contact enquiry was made by {{ enquiry.name }} at {{ "now" | date("Y-m-d H:i") }}.
+
+Reply-To: {{ enquiry.email }}
+Subject: {{ enquiry.subject }}
+Body:
+{{ enquiry.body }}

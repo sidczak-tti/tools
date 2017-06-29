@@ -1,0 +1,358 @@
+1. Dodajemy nastêpujace linie kodu zaznaczone w ADD
+# app/config/security.yml
+ 
+security:
+    firewalls:
+#ADD#########################################
+        secured_area:
+            pattern:    ^/
+            anonymous: ~
+            form_login:
+                login_path:  /login
+                check_path:  /login_check
+##########################################
+ 
+    access_control:
+#ADD#########################################
+        - { path: ^/admin, roles: ROLE_ADMIN }
+##########################################
+ 
+    providers:
+        in_memory:
+            users:
+                admin: { password: adminpass, roles: 'ROLE_ADMIN' }
+ 
+    encoders:
+        Symfony\Component\Security\Core\User\User: plaintext
+
+2.Dodajemy routing
+
+# src/Ens/JobeetBundle/Resources/config/routing.yml
+ 
+login:
+    pattern:   /login
+    defaults:  { _controller: EnsJobeetBundle:Default:login }
+login_check:
+    pattern:   /login_check
+
+3.Dodajemy klase logowania
+
+// src/Ens/JobeetBundle/Controller/DefaultController.php
+ 
+namespace Ens\JobeetBundle\Controller;
+ 
+use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+use Symfony\Component\Security\Core\SecurityContext;
+ 
+class DefaultController extends Controller
+{
+    // ...
+ 
+    public function loginAction()
+    {
+        $request = $this->getRequest();
+        $session = $request->getSession();
+ 
+        // get the login error if there is one
+        if ($request->attributes->has(SecurityContext::AUTHENTICATION_ERROR)) {
+            $error = $request->attributes->get(SecurityContext::AUTHENTICATION_ERROR);
+        } else {
+            $error = $session->get(SecurityContext::AUTHENTICATION_ERROR);
+            $session->remove(SecurityContext::AUTHENTICATION_ERROR);
+        }
+ 
+        return $this->render('EnsJobeetBundle:Default:login.html.twig', array(
+            // last username entered by the user
+            'last_username' => $session->get(SecurityContext::LAST_USERNAME),
+            'error'         => $error,
+        ));
+    }
+}
+
+4.Dodajemy formularz logowania
+
+<!-- src/Ens/JobeetBundle/Resources/views/Default/login.html.twig -->
+ 
+{% if error %}
+    <div>{{ error.message }}</div>
+{% endif %}
+ 
+<form action="{{ path('login_check') }}" method="post">
+    <label for="username">Username:</label>
+    <input type="text" id="username" name="_username" value="{{ last_username }}" />
+ 
+    <label for="password">Password:</label>
+    <input type="password" id="password" name="_password" />
+ 
+    <button type="submit">login</button>
+</form>
+
+Teraz po wejœciu na stronê 
+http://jobeet.local/app_dev.php/admin/dashboard
+
+musimy podaæ login: admin i has³o: adminpass
+
+z pliku app/config/security.yml
+
+5.Uwierzytelnianie uzytkowników z bazy danych
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/User.orm.yml
+ 
+Ens\JobeetBundle\Entity\User:
+  type: entity
+  table: user
+  id:
+    id:
+      type: integer
+      generator: { strategy: AUTO }
+  fields:
+    username:
+      type: string
+      length: 255
+    password:
+      type: string
+      length: 255
+
+Stworzenie klasy:
+php app/console doctrine:generate:entities EnsJobeetBundle
+
+Aktualizacja bazy danych:
+php app/console doctrine:schema:update --force
+
+
+6. Diodanie nowych metod do klasy: getRoles, getSalt, eraseCredentials and equals.
+
+// src Ens/JobeetBundle/Entity/User.php
+ 
+namespace Ens\JobeetBundle\Entity;
+# ADD ################ 
+use Symfony\Component\Security\Core\User\UserInterface;
+#################
+use Doctrine\ORM\Mapping as ORM;
+ 
+class User implements UserInterface
+{
+    private $id;
+ 
+    private $username;
+ 
+    private $password;
+ 
+    public function getId()
+    {
+        return $this->id;
+    }
+ 
+    public function setUsername($username)
+    {
+        $this->username = $username;
+    }
+ 
+    public function getUsername()
+    {
+        return $this->username;
+    }
+ 
+    public function setPassword($password)
+    {
+        $this->password = $password;
+    }
+ 
+    public function getPassword()
+    {
+        return $this->password;
+    }
+# ADD ################ 
+    public function getRoles()
+    {
+        return array('ROLE_ADMIN');
+    }
+ 
+    public function getSalt()
+    {
+        return null;
+    }
+ 
+    public function eraseCredentials()
+    {
+ 
+    }
+ 
+    public function equals(UserInterface $user)
+    {
+        return $user->getUsername() == $this->getUsername();
+    }
+#################
+}
+
+
+7.
+
+# app/config/security.yml
+# ...
+ 
+    providers:
+        main:
+            entity: { class: Ens\JobeetBundle\Entity\User, property: username }
+ 
+    encoders:
+        Ens\JobeetBundle\Entity\User: sha512
+
+
+8. Tworzenie pierwszego u¿ytkownika:
+
+
+// src/Ens/JobeetBundle/Command/JobeetUsersCommand.php
+ 
+namespace Ens\JobeetBundle\Command;
+ 
+use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+use Ens\JobeetBundle\Entity\User;
+ 
+class JobeetUsersCommand extends ContainerAwareCommand
+{
+    protected function configure()
+    {
+        $this
+            ->setName('ens:jobeet:users')
+            ->setDescription('Add Jobeet users')
+            ->addArgument('username', InputArgument::REQUIRED, 'The username')
+            ->addArgument('password', InputArgument::REQUIRED, 'The password')
+        ;
+    }
+ 
+    protected function execute(InputInterface $input, OutputInterface $output)
+    {
+        $username = $input->getArgument('username');
+        $password = $input->getArgument('password');
+ 
+        $em = $this->getContainer()->get('doctrine')->getEntityManager();
+ 
+        $user = new User();
+        $user->setUsername($username);
+        // encode the password
+        $factory = $this->getContainer()->get('security.encoder_factory');
+        $encoder = $factory->getEncoder($user);
+        $encodedPassword = $encoder->encodePassword($password, $user->getSalt());
+        $user->setPassword($encodedPassword);
+        $em->persist($user);
+        $em->flush();
+ 
+        $output->writeln(sprintf('Added %s user with password %s', $username, $password));
+    }
+}
+
+9.Dodawanie nowych u¿ytkowników
+
+php app/console ens:jobeet:users admin admin
+
+php app/console ens:jobeet:users root root
+
+
+10.wylogowanie z serwisu:
+
+# app/config/security.yml
+security:
+    firewalls:
+        secured_area:
+            # ...
+            logout:
+                path:   /logout
+                target: /
+    # ...
+
+11. Przyjazny URL
+# src/Ens/JobeetBundle/Resources/config/routing.yml
+# ...
+ 
+logout:
+    pattern:   /logout
+ 
+# ...
+12. Link logout user_block.html.twig
+
+C:\sf2_tutorials\jobeet2\vendor\bundles\Sonata\AdminBundle\Resources\views\Core\user_block.html.twig
+
+{% block user_block %}<a href="{{ path('logout') }}">Logout</a>{% endblock %}
+
+13. The User Session - sesje uzytkowników
+
+Przechowywanie w sesji uzytkownika ostatnich trzech kliknietych ofert:
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function showAction($id)
+{
+    $em = $this->getDoctrine()->getEntityManager();
+ 
+    $entity = $em->getRepository('EnsJobeetBundle:Job')->getActiveJob($id);
+ 
+    if (!$entity) {
+        throw $this->createNotFoundException('Unable to find Job entity.');
+    }
+ 
+    $session = $this->getRequest()->getSession();
+ 
+    // fetch jobs already stored in the job history
+    $jobs = $session->get('job_history', array());
+ 
+    // store the job as an array so we can put it in the session and avoid entity serialize errors
+    $job = array('id' => $entity->getId(), 'position' =>$entity->getPosition(), 'company' => $entity->getCompany(), 'companyslug' => $entity->getCompanySlug(), 'locationslug' => $entity->getLocationSlug(), 'positionslug' => $entity->getPositionSlug());
+ 
+    if (!in_array($job, $jobs)) {
+        // add the current job at the beginning of the array
+        array_unshift($jobs, $job);
+ 
+        // store the new job history back into the session
+        $session->set('job_history', array_slice($jobs, 0, 3));
+    }
+ 
+    $deleteForm = $this->createDeleteForm($id);
+ 
+    return $this->render('EnsJobeetBundle:Job:show.html.twig', array(
+        'entity'      => $entity,
+        'delete_form' => $deleteForm->createView(),
+    ));
+}
+
+
+14. Zmian w template
+
+<!-- src/End/JobeetBundle/Resources/views/layout.html.twig -->
+<!-- ... -->
+ 
+<div id="job_history">
+    Recent viewed jobs:
+    <ul>
+        {% for job in app.session.get('job_history') %}
+            <li>
+                <a href="{{ path('ens_job_show', { 'id': job.id, 'company': job.companyslug, 'location': job.locationslug, 'position': job.positionslug }) }}">{{ job.position }} - {{ job.company }}</a>
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+ 
+<div id="content">
+ 
+<!-- ... -->
+
+15.Flash Messages - wyœwietlanie informacji podczas publikowania pracy:
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+
+previewAction
+
+public function publishAction($token)<!-- 10 dzieñ
+{
+    // ...
+ 
+    $this->get('session')->setFlash('notice', 'Your job is now online for 30 days.');
+ 
+    // ...
+}

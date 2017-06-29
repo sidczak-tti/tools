@@ -1,0 +1,115 @@
+1.	C:\wamp\bin\apache\Apache2.2.17\conf\httpd.conf
+linux# /etc/httpd/conf/httpd.conf
+
+#127.0.0.1      jobeet2.localhost
+NameVirtualHost 127.0.0.1:80
+Listen 127.0.0.1:80
+<VirtualHost 127.0.0.1:80>
+  DocumentRoot "C:/sf2_tutorials/jobeet2/web"
+  DirectoryIndex app.php
+
+  #Linux UBUNTU
+  #ErrorLog /var/log/apache2/jobeet2-error.log
+  #CustomLog /var/log/apache2/jobeet2-access.log combined
+    
+  #Wamp Server
+  ErrorLog C:/wamp/logs/jobeet2-error.log
+  CustomLog C:/wamp/logs/jobeet2-access.log combined
+
+  #lub Wamp Server
+  #ErrorLog C:/wamp/bin/apache/Apache2.2.17/logs/jobeet2-error.log
+  #CustomLog C:/wamp/bin/apache/Apache2.2.17/logs/jobeet2-access.log combined
+
+  <Directory "C:/sf2_tutorials/jobeet2/web">
+    AllowOverride All
+    Allow from All
+  </Directory>
+</VirtualHost>
+
+
+2.	C:\wamp\bin\apache\Apache2.2.17\conf\extra\httpd-vhosts.conf
+
+#127.0.0.1      jobeet2.localhost
+<VirtualHost 127.0.0.1:80>
+  ServerName jobeet2.localhost
+  DocumentRoot "C:/sf2_tutorials/jobeet2/web"
+  DirectoryIndex app.php
+  
+  #Linux UBUNTU
+  #ErrorLog /var/log/apache2/jobeet2-error.log
+  #CustomLog /var/log/apache2/jobeet2-access.log combined
+
+  #Wamp Server
+  ErrorLog C:/wamp/logs/jobeet2-error.log
+  CustomLog C:/wamp/logs/jobeet2-access.log combined
+
+  <Directory "C:/sf2_tutorials/jobeet2/web">
+    AllowOverride All
+    Allow from All
+  </Directory>
+</VirtualHost>
+
+
+
+
+3.	W katalogu C:/wamp/logs tworzymy dwa pliki:
+
+	jobeet2-error.log
+	jobeet2-access.log
+
+4.	C:/Windows/System32/drivers/etc/hosts
+linux# /etc/hosts
+
+	127.0.0.1      jobeet2.localhost
+
+	Aby modyfikowaæ "hosts" nalezy otworzyæ plik przez edytor zamkn¹æ edytor, a nastêpnie uruchomiæ go jeszcze raz przez -> Uruchom jako administrator
+	Aby modyfikowaæ "hosts" nalezy w³¹czyæ edytor tekstowy poprzez -> Uruchom jako administrator, a nastêpnie przeci¹gn¹æ do edytora plik
+
+linux# sudo service httpd restart
+
+5.	Pobranie framework-a ze strony http://symfony.com/download
+	i wrzucenie do katalogu C:/sf2_tutorials/jobeet2
+
+win
+$ rm -rf app/cache/*
+$ rm -rf app/logs/*
+
+linux
+$ sudo chmod +a "www-data allow delete,write,append,file_inherit,directory_inherit" app/cache app/logs
+$ sudo chmod +a "`whoami` allow delete,write,append,file_inherit,directory_inherit" app/cache app/logs
+
+6.	Sprawdzenie konfiguracji
+
+	http://jobeet2.localhost/config.php
+
+7.	Wchodzimy na strone: 
+	http://jobeet2.localhost/app_dev.php
+	i wciskamy button: "Configure" Stworzenie bazy danych.
+
+	Do pliku: C:/sf2_tutorials/jobeet2/app/config/parameters.ini
+	zostan¹ wprowadzone nastêpuj¹ce zmiany.
+
+	[parameters]
+
+		database_driver="pdo_mysql"
+    
+		database_host="localhost"
+    
+		database_name="jobeet2"
+    
+		database_user="root"
+    
+		database_password=""
+    
+		mailer_transport="smtp"
+    
+		mailer_host="localhost"
+    
+		mailer_user=""
+    
+		mailer_password=""
+    
+		locale="en"
+    
+		secret="5c5cefc81ad9caebd88d25dc8474641ff8d0e990"
+

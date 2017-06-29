@@ -1,0 +1,466 @@
+1. Wyœwietlanie strony z list¹ prac danej kategorii:
+
+
+# src/Ens/JobeetBundle/Resources/config/routing.yml
+ 
+EnsJobeetBundle_category:
+    pattern:  /category/{slug}
+    defaults: { _controller: EnsJobeetBundle:Category:show }
+
+
+
+2. Dodajemy metodê slug
+// src/Ens/JobeetBundle/Entity/Category.php
+// ...
+ 
+use Ens\JobeetBundle\Utils\Jobeet;
+ 
+class Category
+{
+  // ...
+ 
+  public function getSlug()
+  {
+    return Jobeet::slugify($this->getName());
+  }
+ 
+  // ...
+}
+
+3. Dodajemy link do nowej kategorii
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.html.twig -->
+<!-- some HTML code -->
+ 
+            <h1><a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug }) }}">{{ category.name }}</a></h1>
+ 
+<!-- some HTML code -->
+ 
+          </table>
+ 
+          {% if category.morejobs %}
+            <div class="more_jobs">
+              and <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug }) }}">{{ category.morejobs }}</a>
+              more...
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+{% endblock %}
+
+
+
+4. {% if category.morejobs %} dodajemy nowe metody:
+
+// src/Ens/JobeetBunlde/Entity/Category.php
+// ...
+ 
+private $more_jobs;
+ 
+// ...
+ 
+public function setMoreJobs($jobs)
+{
+  $this->more_jobs = $jobs >=  0 ? $jobs : 0;
+}
+ 
+public function getMoreJobs()
+{
+  return $this->more_jobs;
+}
+ 
+// ...
+
+
+5. Pobranie listy stron z dan¹ kategori¹
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function indexAction()
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $categories = $em->getRepository('EnsJobeetBundle:Category')->getWithJobs();
+ 
+  foreach($categories as $category)
+  {
+    $category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId(), $this->container->getParameter('max_jobs_on_homepage')));
+    $category->setMoreJobs($em->getRepository('EnsJobeetBundle:Job')->countActiveJobs($category->getId()) - $this->container->getParameter('max_jobs_on_homepage')); <- pobranie liczbt stron
+  }
+ 
+  return $this->render('EnsJobeetBundle:Job:index.html.twig', array(
+    'categories' => $categories
+  ));
+}
+// ...
+
+6. Dodanie metody pobieraj¹cej liczbê stron:
+
+// src/Ens/JobeetBundle/Repository/JobRepository.php
+// ...
+ 
+public function countActiveJobs($category_id = null)
+{
+  $qb = $this->createQueryBuilder('j')
+    ->select('count(j.id)')
+    ->where('j.expires_at > :date')
+    ->setParameter('date', date('Y-m-d H:i:s', time()));
+ 
+  if($category_id)
+  {
+    $qb->andWhere('j.category = :category_id')
+    ->setParameter('category_id', $category_id);
+  }
+ 
+  $query = $qb->getQuery();
+ 
+  return $query->getSingleScalarResult();
+}
+
+7.Tworzenie nowego kontrolera CategoryController.php
+mo¿emy do zrobiæ za pomoc¹ polecenia
+
+
+php app/console doctrine:generate:crud --entity=EnsJobeetBundle:Category --route-prefix=ens_job --with-write --format=yml
+
+lub utworzyæ plik rêcznie
+
+// src/Ens/JobeetBundle/Controller/CategoryController
+ 
+namespace Ens\JobeetBundle\Controller;
+use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+use Ens\JobeetBundle\Entity\Category;
+ 
+/**
+* Category controller.
+*
+*/
+class CategoryController extends Controller
+{
+ 
+}
+
+
+8.Dodanie kolumny slug
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/Category.orm.yml
+ 
+Ens\JobeetBundle\Entity\Category:
+  type: entity
+  repositoryClass: Ens\JobeetBundle\Repository\CategoryRepository
+  table: category
+  id:
+    id:
+      type: integer
+      generator: { strategy: AUTO }
+  fields:
+    name:
+      type: string
+      length: 255
+      unique: true
+    slug:
+      type: string
+      length: 255
+      unique: true
+  oneToMany:
+    jobs:
+      targetEntity: Job
+      mappedBy: category
+    category_affiliates:
+      targetEntity: CategoryAffiliate
+      mappedBy: category
+  lifecycleCallbacks:
+    prePersist: [ setSlugValue ]
+    #preUpdate: [ setSlugValue ]
+
+php app/console doctrine:generate:entities EnsJobeetBundle
+
+
+9. Do klasy Category.php dodajemy:
+
+
+// srr/Ens/JobeetBundle/Entity/Category.php
+// ...
+ 
+/**
+* @var string $slug
+*/
+private $slug;
+ 
+/**
+* Set slug
+*
+* @param string $slug
+*/
+public function setSlug($slug)
+{
+    $this->slug = $slug;
+}
+/**
+* Get slug
+*
+* @return string
+*/
+public function getSlug()
+{
+    return $this->slug;
+}
+/**
+* @ORM\prePersist
+*/
+public function setSlugValue()
+{
+    // Add your code here
+}
+
+Do metody dodajemy nastêpuj¹ca funkcjie:
+
+public function setSlugValue()
+{
+    $this->slug = Jobeet::slugify($this->getName());
+}
+
+
+10. Tworzymy kolumnê w bazie danych i ³adujemy dane:
+
+php app/console doctrine:database:drop --force
+php app/console doctrine:database:create
+php app/console doctrine:schema:update --force
+php app/console doctrine:fixtures:load
+
+
+11. Category Page - tworzenie strony kategorii akcja show
+
+Tworzymy metode show w kontrloerze:
+
+// src/Ens/JobeetBundle/Controller/CategoryController.php
+// ...
+ 
+public function showAction($slug)
+{
+    $em = $this->getDoctrine()->getEntityManager();
+ 
+    $category = $em->getRepository('EnsJobeetBundle:Category')->findOneBySlug($slug);
+ 
+    if (!$category) {
+        throw $this->createNotFoundException('Unable to find Category entity.');
+    }
+ 
+    $category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId()));
+ 
+    return $this->render('EnsJobeetBundle:Category:show.html.twig', array(
+        'category' => $category,
+    ));
+}
+ 
+// ...
+
+12. Tworzenie nowego widoku:
+    src/Ens/JobeetBundle/Resources/views/Category/show.html.twig
+
+{% extends 'EnsJobeetBundle::layout.html.twig' %}
+ 
+{% block title %}
+  Jobs in the {{ category.name }} category
+{% endblock %}
+ 
+{% block stylesheets %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/jobs.css') }}" type="text/css" media="all" />
+{% endblock %}
+ 
+{% block content %}
+  <div class="category">
+    <div class="feed">
+      <a href="">Feed</a>
+    </div>
+    <h1>{{ category.name }}</h1>
+  </div>
+ 
+  <table class="jobs">
+    {% for entity in category.activejobs %}
+      <tr class="{{ cycle(['even', 'odd'], loop.index) }}">
+        <td class="location">{{ entity.location }}</td>
+        <td class="position">
+          <a href="{{ path('ens_job_show', { 'id': entity.id, 'company': entity.companyslug, 'location': entity.locationslug, 'position': entity.positionslug }) }}">
+            {{ entity.position }}
+          </a>
+        </td>
+        <td class="company">{{ entity.company }}</td>
+      </tr>
+    {% endfor %}
+  </table>
+{% endblock %}
+
+13. Refaktoryzacja kodu html:
+    Wworzymy widok z powtarzaj¹c¹ siê czêœci¹ kodu:
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/list.html.twig -->
+ 
+<table class="jobs">
+  {% for entity in jobs %}
+    <tr class="{{ cycle(['even', 'odd'], loop.index) }}">
+      <td class="location">{{ entity.location }}</td>
+      <td class="position">
+        <a href="{{ path('ens_job_show', { 'id': entity.id, 'company': entity.companyslug, 'location': entity.locationslug, 'position': entity.positionslug }) }}">
+          {{ entity.position }}
+        </a>
+      </td>
+      <td class="company">{{ entity.company }}</td>
+    </tr>
+  {% endfor %}
+</table>
+
+14. Zamieniamy fragmêt kodu z tabelk¹ na:
+
+<!-- in src/Ens/JobeetBundle/Resources/view/Job/index.html.twig -->
+{% include 'EnsJobeetBundle:Job:list.html.twig' with {'jobs': category.activejobs} %}
+ 
+<!-- in src/Ens/JobeetBundle/Resources/view/Category/show.html.twig -->
+{% include 'EnsJobeetBundle:Job:list.html.twig' with {'jobs': category.activejobs} %}
+
+15. List Pagination - paginacja
+
+# src/Ens/JobeetBundle/Resources/config/routing.yml
+Zmiana routingu z wyœwietlonymi pracami danej kategorii:
+ 
+EnsJobeetBundle_category:
+    pattern: /category/{slug}/{page}
+    defaults: { _controller: EnsJobeetBundle:Category:show, page: 1 }
+ 
+# ...
+
+# app/config/config.yml
+# ...
+ 
+parameters:
+    max_jobs_on_homepage: 10
+    max_jobs_on_category: 20
+
+
+
+// src/Ens/JobeetBundle/Repository/JobRepository.php
+// ...
+Dodanie zmiennej $offset
+ 
+public function getActiveJobs($category_id = null, $max = null, $offset = null)
+{
+  $qb = $this->createQueryBuilder('j')
+    ->where('j.expires_at > :date')
+    ->setParameter('date', date('Y-m-d H:i:s', time()))
+    ->orderBy('j.expires_at', 'DESC');
+ 
+  if($max)
+  {
+    $qb->setMaxResults($max);
+  }
+ 
+  if($offset)
+  {
+    $qb->setFirstResult($offset);
+  }
+ 
+  if($category_id)
+  {
+    $qb->andWhere('j.category = :category_id')
+       ->setParameter('category_id', $category_id);
+  }
+ 
+  $query = $qb->getQuery();
+ 
+  return $query->getResult();
+}
+
+
+// src/Ens/JobeetBundle/Controller/CategoryController.php
+// ...
+ 
+public function showAction($slug, $page)
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $category = $em->getRepository('EnsJobeetBundle:Category')->findOneBySlug($slug);
+ 
+  if (!$category) {
+    throw $this->createNotFoundException('Unable to find Category entity.');
+  }
+ 
+  $total_jobs = $em->getRepository('EnsJobeetBundle:Job')->countActiveJobs($category->getId());
+  $jobs_per_page = $this->container->getParameter('max_jobs_on_category');
+  $last_page = ceil($total_jobs / $jobs_per_page);
+  $previous_page = $page > 1 ? $page - 1 : 1;
+  $next_page = $page < $last_page ? $page + 1 : $last_page;
+ 
+  $category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId(), $jobs_per_page, ($page - 1) * $jobs_per_page));
+ 
+  return $this->render('EnsJobeetBundle:Category:show.html.twig', array(
+    'category' => $category,
+    'last_page' => $last_page,
+    'previous_page' => $previous_page,
+    'current_page' => $page,
+    'next_page' => $next_page,
+    'total_jobs' => $total_jobs
+  ));
+}
+
+<!-- src/Ens/JobeetBundle/Resources/views/Category/show.html.twig -->
+ 
+{% extends 'EnsJobeetBundle::layout.html.twig' %}
+ 
+{% block title %}
+  Jobs in the {{ category.name }} category
+{% endblock %}
+ 
+{% block stylesheets %}
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/jobs.css') }}" type="text/css" media="all" />
+{% endblock %}
+ 
+{% block content %}
+  <div class="category">
+    <div class="feed">
+      <a href="">Feed</a>
+    </div>
+    <h1>{{ category.name }}</h1>
+  </div>
+ 
+  {% include 'EnsJobeetBundle:Job:list.html.twig' with {'jobs': category.activejobs} %}
+ 
+  {% if last_page > 1 %}
+    <div class="pagination">
+      <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug, 'page': 1 }) }}">
+        <img src="{{ asset('bundles/ensjobeet/images/first.png') }}" alt="First page" title="First page" />
+      </a>
+ 
+      <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug, 'page': previous_page }) }}">
+        <img src="{{ asset('bundles/ensjobeet/images/previous.png') }}" alt="Previous page" title="Previous page" />
+      </a>
+ 
+      {% for page in 1..last_page %}
+        {% if page == current_page %}
+          {{ page }}
+        {% else %}
+          <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug, 'page': page }) }}">{{ page }}</a>
+        {% endif %}
+      {% endfor %}
+ 
+      <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug, 'page': next_page }) }}">
+        <img src="{{ asset('bundles/ensjobeet/images/next.png') }}" alt="Next page" title="Next page" />
+      </a>
+ 
+      <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug, 'page': last_page }) }}">
+        <img src="{{ asset('bundles/ensjobeet/images/last.png') }}" alt="Last page" title="Last page" />
+      </a>
+    </div>
+  {% endif %}
+ 
+  <div class="pagination_desc">
+    <strong>{{ total_jobs }}</strong> jobs in this category
+ 
+    {% if last_page > 1 %}
+      - page <strong>{{ current_page }}/{{ last_page }}</strong>
+    {% endif %}
+  </div>
+{% endblock %}

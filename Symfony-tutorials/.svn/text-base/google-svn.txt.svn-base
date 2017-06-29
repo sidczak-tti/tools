@@ -1,0 +1,35 @@
+1. subversion - zakladanie repozytorium google
+
+Klikamy: create a project...
+https://code.google.com/hosting/createProject
+
+Project name: sf-presonal
+Project summary: personal page
+Description:
+Version control system: subversion
+Source code license: GNU GPL v3
+Project label(s): PHP
+
+Import projektu do repozytorium google kode:
+
+https://sf2-personal.googlecode.com/svn/trunk/szymon-idczak
+po zaimportowaniu projektu do repozytorium œci¹gamy go
+
+
+SVN Checkout... lub svn -> export
+
+https://sf2-personal.googlecode.com/svn/trunk/szymon-idczak
+D:\sf2-personal\szymon-idczak
+login: szymon.idczak
+has³o: https://code.google.com/hosting/settings ra5GC4rM9vB2
+
+
+
+https://sf2-tutorials.googlecode.com/svn/trunk/jobeet2
+D:\sf2-tutorials\jobeet2
+
+¦ci±ganie projektu na linux
+wchodzimy do katalogu var/www i zak³adamy katalog sf2-personal wchodzimy do niego
+i wydajemy komende:
+svn co https://sf2-personal.googlecode.com/svn/trunk/szymon-idczak szymon-idczak
+Projekt zostaje dodany

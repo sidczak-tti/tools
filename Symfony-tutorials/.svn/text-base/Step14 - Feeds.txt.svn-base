@@ -1,0 +1,208 @@
+1.
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.atom.twig -->
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Jobeet</title>
+  <subtitle>Latest Jobs</subtitle>
+  <link href="" rel="self"/>
+  <link href=""/>
+  <updated></updated>
+  <author><name>Jobeet</name></author>
+  <id>Unique Id</id>
+ 
+  <entry>
+    <title>Job title</title>
+    <link href="" />
+    <id>Unique id</id>
+    <updated></updated>
+    <summary>Job description</summary>
+    <author><name>Company</name></author>
+  </entry>
+</feed>
+
+2.
+<!-- src/Ens/JobeetBundle/Resources/views/layout.html.twig -->
+<!-- ... -->
+ 
+<li><a href="{{ path('ens_job', {'_format': 'atom'}) }}">Full feed</a></li>
+ 
+<!-- ... -->
+
+3.
+<!-- src/Ens/JobeetBundle/Resources/views/layout.html.twig -->
+<!-- ... -->
+ 
+<link rel="alternate" type="application/atom+xml" title="Latest Jobs" href="{{ url('ens_job', {'_format': 'atom'}) }}" />
+ 
+<!-- ... -->
+
+4.
+// src/Ens/JobeetBundle/Controller/JobController.php
+
+    public function indexAction()
+    {
+        $em = $this->getDoctrine()->getEntityManager();
+        
+      	$categories = $em->getRepository('EnsJobeetBundle:Category')->getWithJobs();
+ 
+	foreach($categories as $category)
+	{
+		  
+		  $category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId(), 10));
+		  
+		  $category->setMoreJobs($em->getRepository('EnsJobeetBundle:Job')->countActiveJobs($category->getId()) - 10);
+		  
+	}
+        
+		
+
+        $format = $this->getRequest()->getRequestFormat();
+        
+	return $this->render('EnsJobeetBundle:Job:index.'.$format.'.twig', array(
+		'categories' => $categories
+	));
+        
+    }
+
+5.
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.atom.twig -->
+<!-- ... -->
+ 
+  <title>Jobeet</title>
+  <subtitle>Latest Jobs</subtitle>
+  <link href="{{ url('ens_job', {'_format': 'atom'}) }}" rel="self"/>
+  <link href="{{ url('EnsJobeetBundle_homepage') }}"/>
+  <updated>{{ lastUpdated }}</updated>
+  <author><name>Jobeet</name></author>
+  <id>{{ feedId }}</id>
+ 
+<!-- ... -->
+
+6.
+// src/Ens/JobeetBundle/Controller/JobController.php
+
+    public function indexAction()
+    {
+        $em = $this->getDoctrine()->getEntityManager();
+        
+      	$categories = $em->getRepository('EnsJobeetBundle:Category')->getWithJobs();
+ 
+	foreach($categories as $category)
+	{
+		  
+		  $category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId(), 10));
+		  
+		  $category->setMoreJobs($em->getRepository('EnsJobeetBundle:Job')->countActiveJobs($category->getId()) - 10);
+		  
+	}
+        
+		
+
+        $format = $this->getRequest()->getRequestFormat();
+        
+	return $this->render('EnsJobeetBundle:Job:index.'.$format.'.twig', array(
+		'categories' => $categories,
+		'lastUpdated' => $em->getRepository('EnsJobeetBundle:Job')->getLatestPost()->getCreatedAt()->format(DATE_ATOM),
+		'feedId' => sha1($this->get('router')->generate('ens_job', array('_format'=> 'atom'), true)),
+	));
+        
+    }
+
+7.
+// src/Ens/JobeetBundle/Repository/JobRepository.php
+// ...
+ 
+public function getLatestPost()
+{
+    $query = $this->createQueryBuilder('j')
+        ->where('j.expires_at > :date')
+        ->setParameter('date', date('Y-m-d H:i:s', time()))
+        ->andWhere('j.is_activated = :activated')
+        ->setParameter('activated', 1)
+        ->orderBy('j.expires_at', 'DESC')
+        ->setMaxResults(1)
+        ->getQuery();
+ 
+    try {
+        $job = $query->getSingleResult();
+    } catch (\Doctrine\Orm\NoResultException $e) {
+        $job = null;
+    }
+ 
+    return $job;
+}
+ 
+// ...
+
+8.
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.html.twig -->
+<div class="feed">
+  <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug, '_format': 'atom' }) }}">Feed</a>
+</div>
+ 
+<!-- src/Ens/JobeetBundle/Resources/views/Category/show.html.twig -->
+<div class="feed">
+  <a href="{{ path('EnsJobeetBundle_category', { 'slug': category.slug, '_format': 'atom' }) }}">Feed</a>
+</div>
+
+9.
+// src/Ens/JobeetBundle/Controller/CategoryController.php
+
+public function showAction($slug, $page)
+{
+// ...
+ 
+$format = $this->getRequest()->getRequestFormat();
+ 
+return $this->render('EnsJobeetBundle:Category:show.'.$format.'.twig', array(
+    'category' => $category,
+    'last_page' => $last_page,
+    'previous_page' => $previous_page,
+    'current_page' => $page,
+    'next_page' => $next_page,
+    'total_jobs' => $total_jobs,
+    'feedId' => sha1($this->get('router')->generate('EnsJobeetBundle_category', array('slug' =>  $category->getSlug(), '_format' => 'atom'), true)),
+));
+
+}
+
+10.
+
+<!-- src/Ens/JobeetBundle/Resources/views/Category/show.atom.twig -->
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Jobeet ({{ category.name }})</title>
+  <subtitle>Latest Jobs</subtitle>
+  <link href="{{ url('EnsJobeetBundle_category', { 'slug': category.slug, '_format': 'atom' }) }}" rel="self" />
+  <link href="{{ url('EnsJobeetBundle_category', { 'slug': category.slug }) }}" />
+  <updated>{{ category.activejobs[0].createdAt.format(constant('DATE_ATOM')) }}</updated>
+  <author><name>Jobeet</name></author>
+  <id>{{ feedId }}</id>
+ 
+  {% for entity in category.activejobs %}
+    <entry>
+      <title>{{ entity.position }} ({{ entity.location }})</title>
+      <link href="{{ url('ens_job_show', { 'id': entity.id, 'company': entity.companyslug, 'location': entity.locationslug, 'position': entity.positionslug }) }}" />
+      <id>{{ entity.id }}</id>
+      <updated>{{ entity.createdAt.format(constant('DATE_ATOM')) }}</updated>
+      <summary type="xhtml">
+        <div xmlns="http://www.w3.org/1999/xhtml">
+          {% if entity.logo %}
+            <div>
+              <a href="{{ entity.url }}">
+                <img src="http://{{ app.request.host }}/uploads/jobs/{{ entity.logo }}" alt="{{ entity.company }} logo" />
+              </a>
+            </div>
+          {% endif %}
+          <div>
+            {{ entity.description|nl2br }}
+          </div>
+          <h4>How to apply?</h4>
+          <p>{{ entity.howtoapply }}</p>
+        </div>
+      </summary>
+      <author><name>{{ entity.company }}</name></author>
+    </entry>
+  {% endfor %}
+</feed>

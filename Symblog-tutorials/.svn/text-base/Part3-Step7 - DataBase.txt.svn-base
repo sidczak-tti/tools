@@ -1,0 +1,93 @@
+1.
+
+<?php
+// src/Blogger/BlogBundle/Entity/Blog.php
+
+namespace Blogger\BlogBundle\Entity;
+
+use Doctrine\ORM\Mapping as ORM;
+
+/**
+ * @ORM\Entity
+ * @ORM\Table(name="blog")
+ */
+class Blog
+{
+    /**
+     * @ORM\Id
+     * @ORM\Column(type="integer")
+     * @ORM\GeneratedValue(strategy="AUTO")
+     */
+    protected $id;
+
+    /**
+     * @ORM\Column(type="string")
+     */
+    protected $title;
+
+    /**
+     * @ORM\Column(type="string", length=100)
+     */
+    protected $author;
+
+    /**
+     * @ORM\Column(type="text")
+     */
+    protected $blog;
+
+    /**
+     * @ORM\Column(type="string", length="20")
+     */
+    protected $image;
+
+    /**
+     * @ORM\Column(type="text")
+     */
+    protected $tags;
+
+    protected $comments;
+
+    /**
+     * @ORM\Column(type="datetime")
+     */
+    protected $created;
+
+    /**
+     * @ORM\Column(type="datetime")
+     */
+    protected $updated;
+}
+
+2.
+
+Stworzenie dodatkowych metod w klasie Blog poleceniem symfony
+// src/Blogger/BlogBundle/Entity/Blog.php
+
+$ php app/console doctrine:generate:entities Blogger
+
+
+3.
+
+Tworzenie pliku yaml poleceniem symfony
+Mapowanie klasy bloga w formacie yaml:
+
+$ php app/console doctrine:mapping:convert --namespace="Blogger\BlogBundle\Entity\Blog" yaml src/Blogger/BlogBundle/Resources/config/doctrine
+
+// src/Blogger/BlogBundle/Resources/config/doctrine/Blogger.BlogBundle.Entity.Blog.orm.yml
+Nazwê pliku zmieniamy na:
+// src/Blogger/BlogBundle/Resources/config/doctrine/Blog.orm.yml
+
+4.Tworzenie bazy danych
+
+Nalerzy uruchomiæ lokalny serwer
+
+Konfiguracja bazy danych:
+app/config/parameters.ini
+
+Polecenie:
+$ php app/console doctrine:database:create
+
+5. Tworzenie tabeli Bloga
+
+$ php app/console doctrine:schema:create
+

@@ -1,0 +1,41 @@
+1. Doctrine 2 Migrations
+
+C:\sf2_tutorials\symblog\deps
+
+[doctrine-migrations]
+    git=http://github.com/doctrine/migrations.git
+
+[DoctrineMigrationsBundle]
+    git=http://github.com/doctrine/DoctrineMigrationsBundle.git
+    target=/bundles/Symfony/Bundle/DoctrineMigrationsBundle
+    version=origin/2.0
+
+$ php bin/vendors install -reinstall
+
+
+2.
+// app/autoload.php
+// ...
+$loader->registerNamespaces(array(
+// ...
+'Doctrine\\DBAL\\Migrations' => __DIR__.'/../vendor/doctrine-migrations/lib',
+'Doctrine\\DBAL'             => __DIR__.'/../vendor/doctrine-dbal/lib',
+// ...
+));
+
+3.
+// app/AppKernel.php
+public function registerBundles()
+{
+    $bundles = array(
+        // ...
+        new Symfony\Bundle\DoctrineMigrationsBundle\DoctrineMigrationsBundle(),
+        // ...
+    );
+    // ...
+}
+
+4.
+Przy w³¹czonym wirtualnym serwerze
+$ php app/console doctrine:migrations:diff
+$ php app/console doctrine:migrations:migrate

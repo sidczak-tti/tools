@@ -1,0 +1,195 @@
+
+Aby wy³¹czyæ AcmeDemoBundle(przyk³adowy projekt) musimy zakomentowaæ natêpujacy routing:
+
+C:\sf2_tutorials\jobeet2\app\config\routing_dev.yml
+
+#_welcome:
+#    pattern:  /
+#    defaults: { _controller: AcmeDemoBundle:Welcome:index }
+
+#_demo_secured:
+#    resource: "@AcmeDemoBundle/Controller/SecuredController.php"
+#    type:     annotation
+
+#_demo:
+#    resource: "@AcmeDemoBundle/Controller/DemoController.php"
+#    type:     annotation
+#    prefix:   /demo
+
+
+# app/config/routing.yml
+ 
+EnsJobeetBundle:
+    resource: "@EnsJobeetBundle/Resources/config/routing.yml"
+    prefix:   /
+
+# src/Ens/JobeetBundle/Resources/config/routing.yml
+ 
+EnsJobeetBundle_job:
+    resource: "@EnsJobeetBundle/Resources/config/routing/job.yml"
+    prefix: /job
+ 
+EnsJobeetBundle_homepage:
+    pattern:  /hello/{name}
+    defaults: { _controller: EnsJobeetBundle:Default:index }
+
+# src/Ens/JobeetBundle/Resources/config/routing/job.yml
+ 
+ens_job:
+    pattern:  /
+    defaults: { _controller: "EnsJobeetBundle:Job:index" }
+ 
+ens_job_show:
+    pattern:  /{id}/show
+    defaults: { _controller: "EnsJobeetBundle:Job:show" }
+ 
+ens_job_new:
+    pattern:  /new
+    defaults: { _controller: "EnsJobeetBundle:Job:new" }
+ 
+ens_job_create:
+    pattern:  /create
+    defaults: { _controller: "EnsJobeetBundle:Job:create" }
+    requirements: { _method: post }
+ 
+ens_job_edit:
+    pattern:  /{id}/edit
+    defaults: { _controller: "EnsJobeetBundle:Job:edit" }
+ 
+ens_job_update:
+    pattern:  /{id}/update
+    defaults: { _controller: "EnsJobeetBundle:Job:update" }
+    requirements: { _method: post }
+ 
+ens_job_delete:
+    pattern:  /{id}/delete
+    defaults: { _controller: "EnsJobeetBundle:Job:delete" }
+    requirements: { _method: post }
+
+
+Zmieniamy routing dla g³ównej strony projektu
+# src/EnsJobeetBundle/Resources/config/routing.yml
+
+Z:
+EnsJobeetBundle_homepage:
+
+    pattern:  /hello/{name}
+
+    defaults: { _controller: EnsJobeetBundle:Default:index }
+
+Na nastêpuj¹c¹:
+EnsJobeetBundle_homepage:
+    pattern:  /
+    defaults: { _controller: EnsJobeetBundle:Job:index }
+
+Dodatkowo wprowadzamy zmiany path() w template z:
+<h1>
+	<a href="{{ path('ens_job') }}"><img src="{{ asset('bundles/ensjobeet/images/logo.jpg') }}" alt="Jobeet Job Board" /></a>
+</h1>
+
+na:
+<h1>
+	<a href="{{ path('EnsJobeetBundle_homepage') }}"><img src="{{ asset('bundles/ensjobeet/images/logo.jpg') }}" alt="Jobeet Job Board" /></a>
+</h1>
+
+
+Zmieniamy adres URL strony na:
+
+/job/{company}/{location}/{id}/{position}
+
+# src/Ens/JobeetBundle/Resources/config/job/routing.yml
+ens_job_show:
+    pattern:  /{company}/{location}/{id}/{position}
+    defaults: { _controller: "EnsJobeetBundle:Job:show" }
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.html.twig -->
+Zmiana path
+              <a href="{{ path('ens_job_show', { 'id': entity.id }) }}">
+                {{ entity.position }}
+              </a>
+na:
+<!-- ... -->
+<a href="{{ path('ens_job_show', { 'id': entity.id, 'company': entity.company, 'location': entity.location, 'position': entity.position }) }}">
+  {{ entity.position }}
+</a>
+<!-- ... -->
+Otrzymamy nastêpuj¹cy adres URL:
+http://jobeet2.localhost/app_dev.php/job/Sensio Labs/Paris, France/13/Web Developer
+
+Dodajemy nastêpuj¹cy wpis:
+
+// src/Ens/JobeetBundle/Entity/Job.php
+// ...
+ 
+use Ens\JobeetBundle\Utils\Jobeet as Jobeet;
+class Job
+{
+    // ...
+    public function getCompanySlug()
+    {
+        return Jobeet::slugify($this->getCompany());
+    }
+ 
+    public function getPositionSlug()
+    {
+        return Jobeet::slugify($this->getPosition());
+    }
+ 
+    public function getLocationSlug()
+    {
+        return Jobeet::slugify($this->getLocation());
+    }
+}
+
+Tworzymy katalog "Utils" i dodajemy:
+
+<?php
+
+// src/Ens/JobeetBundle/Utils/Jobeet.php
+ 
+namespace Ens\JobeetBundle\Utils;
+class Jobeet
+{
+    static public function slugify($text)
+    {
+        // replace all non letters or digits by -
+        $text = preg_replace('/\W+/', '-', $text);
+ 
+        // trim and lowercase
+        $text = strtolower(trim($text, '-'));
+ 
+        return $text;
+    }
+}
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.html.twig -->
+<!-- ... -->
+<a href="{{ path('ens_job_show', { 'id': entity.id, 'company': entity.companyslug, 'location': entity.locationslug, 'position': entity.positionslug}) }}">
+  {{ entity.position }}
+</a>
+<!-- ... -->
+Otrzymamy nastêpuj¹cy adres URL:
+http://jobeet2.localhost/app_dev.php/job/sensio-labs/paris-france/13/web-developer
+
+
+ens_job_show:
+    pattern:  /{company}/{location}/{id}/{position}
+    defaults: { _controller: "EnsJobeetBundle:Job:show" }
+    requirements:
+        id:  \d+
+Wymuszenie ¿eby {id} by³o wartoœci¹ numeryczn¹.
+
+
+Uzyskanie infromacji na temat route w projekcie:
+	php app/console router:debug
+
+Szczegó³owe informacjê na temat konkretnego routingu:
+	php app/console router:debug ens_job_show
+
+
+
+
+
+
+
+

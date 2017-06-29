@@ -1,0 +1,99 @@
+1. Tworzenie klasy rozszerzaj¹cej mo¿liwoœci twig
+
+<?php
+// src/Blogger/BlogBundle/Twig/Extensions/BloggerBlogExtension.php
+
+namespace Blogger\BlogBundle\Twig\Extensions;
+
+class BloggerBlogExtension extends \Twig_Extension
+{
+    public function getFilters()
+    {
+        return array(
+            'created_ago' => new \Twig_Filter_Method($this, 'createdAgo'),
+        );
+    }
+
+    public function createdAgo(\DateTime $dateTime)
+    {
+        $delta = time() - $dateTime->getTimestamp();
+        if ($delta < 0)
+            throw new \InvalidArgumentException("createdAgo is unable to handle dates in the future");
+
+        $duration = "";
+        if ($delta < 60)
+        {
+            // Seconds
+            $time = $delta;
+            $duration = $time . " second" . (($time > 1) ? "s" : "") . " ago";
+        }
+        else if ($delta <= 3600)
+        {
+            // Mins
+            $time = floor($delta / 60);
+            $duration = $time . " minute" . (($time > 1) ? "s" : "") . " ago";
+        }
+        else if ($delta <= 86400)
+        {
+            // Hours
+            $time = floor($delta / 3600);
+            $duration = $time . " hour" . (($time > 1) ? "s" : "") . " ago";
+        }
+        else
+        {
+            // Days
+            $time = floor($delta / 86400);
+            $duration = $time . " day" . (($time > 1) ? "s" : "") . " ago";
+        }
+
+        return $duration;
+    }
+
+    public function getName()
+    {
+        return 'blogger_blog_extension';
+    }
+}
+
+
+2. Rejestracja nowej klasy
+#src/Blogger/BlogBundle/Resources/config/services.yml
+services:
+    blogger_blog.twig.extension:
+        class: Blogger\BlogBundle\Twig\Extensions\BloggerBlogExtension
+        tags:
+            - { name: twig.extension } 
+
+
+3. Dodanie nowego formatu zmiennej do szablonu
+
+{# src/Blogger/BlogBundle/Resources/views/Page/sidebar.html.twig #}
+
+{# .. #}
+
+<section class="section">
+    <header>
+        <h3>Latest Comments</h3>
+    </header>
+    {% for comment in latestComments %}
+        {# .. #}
+        <em><time datetime="{{ comment.created|date('c') }}">{{ comment.created|created_ago }}</time></em>
+        {# .. #}
+    {% endfor %}
+</section>
+
+
+
+
+{# src/Blogger/BlogBundle/Resources/views/Comment/index.html.twig #}
+
+{% for comment in comments %}
+    <article class="comment {{ cycle(['odd', 'even'], loop.index0) }}" id="comment-{{ comment.id }}">
+        <header>
+            <p><span class="highlight">{{ comment.user }}</span> commented <time datetime="{{ comment.created|date('c') }}">{{ comment.created|created_ago }}</time></p>
+        </header>
+        <p>{{ comment.comment }}</p>
+    </article>
+{% else %}
+    <p>There are no comments for this post. Be the first to comment...</p>
+{% endfor %}

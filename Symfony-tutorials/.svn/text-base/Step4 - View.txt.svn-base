@@ -1,0 +1,220 @@
+Toworzymy g³ówny layout strony layout.html.twig w katalogu:
+
+
+C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\views\layout.html.twig
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>
+      {% block title %}
+        Jobeet - Your best job board
+      {% endblock %}
+    </title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    {% block stylesheets %}
+      <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/main.css') }}" type="text/css" media="all" />
+    {% endblock %}
+    {% block javascripts %}
+    {% endblock %}
+    <link rel="shortcut icon" href="{{ asset('bundles/ensjobeet/images/favicon.ico') }}" />
+  </head>
+  <body>
+    <div id="container">
+      <div id="header">
+        <div class="content">
+          <h1><a href="{{ path('ens_job') }}">
+            <img src="{{ asset('bundles/ensjobeet/images/logo.jpg') }}" alt="Jobeet Job Board" />
+          </a></h1>
+ 
+          <div id="sub_header">
+            <div class="post">
+              <h2>Ask for people</h2>
+              <div>
+                <a href="{{ path('ens_job') }}">Post a Job</a>
+              </div>
+            </div>
+ 
+            <div class="search">
+              <h2>Ask for a job</h2>
+              <form action="" method="get">
+                <input type="text" name="keywords" id="search_keywords" />
+                <input type="submit" value="search" />
+                <div class="help">
+                  Enter some keywords (city, country, position, ...)
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+ 
+      <div id="content">
+        {% if app.session.hasFlash('notice') %}
+          <div class="flash_notice">
+            {{ app.session.flash('notice') }}
+          </div>
+        {% endif %}
+ 
+        {% if app.session.hasFlash('error') %}
+          <div class="flash_error">
+            {{ app.session.flash('error') }}
+          </div>
+        {% endif %}
+ 
+        <div class="content">
+            {% block content %}
+            {% endblock %}
+        </div>
+      </div>
+ 
+      <div id="footer">
+        <div class="content">
+          <span class="symfony">
+            <img src="{{ asset('bundles/ensjobeet/images/jobeet-mini.png') }}" />
+            powered by <a href="http://www.symfony.com/">
+              <img src="{{ asset('bundles/ensjobeet/images/symfony.gif') }}" alt="symfony framework" />
+            </a>
+          </span>
+          <ul>
+            <li><a href="">About Jobeet</a></li>
+            <li class="feed"><a href="">Full feed</a></li>
+            <li><a href="">Jobeet API</a></li>
+            <li class="last"><a href="">Affiliates</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
+
+Dodajemy js, style i obrazki projektu:
+
+	C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\public\css
+	C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\public\images
+	C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\public\js
+
+
+Po wywo³aniu polecenia
+
+	php app/console assets:install web
+
+ca³a struktura katalogów zostanie przeniesiona do katalogu web
+
+	C:\sf2_tutorials\jobeet2\web\bundles\ensjobeet\css
+	C:\sf2_tutorials\jobeet2\web\bundles\ensjobeet\images
+	C:\sf2_tutorials\jobeet2\web\bundles\ensjobeet\js
+
+
+W ka¿dym widoku modu³u Job dodajemy nastêpuj¹ce fragmêty kodu
+C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\views\Job
+
+{% extends 'EnsJobeetBundle::layout.html.twig' %}
+
+ <- g³ówny layout
+{% block content %}
+  <- content
+	Hello {{ name }}!
+
+{% endblock %}
+
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.html.twig -->
+{% extends 'EnsJobeetBundle::layout.html.twig' %}
+ 
+{% block stylesheets %} <- Jeœli chcemy pod³¹czyæ dodatkowe style musimy do³¹czyæ blok
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/jobs.css') }}" type="text/css" media="all" />
+{% endblock %}
+ 
+<!-- the rest of the code -->
+
+{% block content %}
+  
+	Hello {{ name }}! <- content strony
+{% endblock %}
+
+
+
+Strona index - index.html.twig
+
+	C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\views\Job\index.html.twig
+
+{% extends 'EnsJobeetBundle::layout.html.twig' %} <- layout
+ 
+{% block stylesheets %} <- style css
+  {{ parent() }}
+  <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/jobs.css') }}" type="text/css" media="all" />
+{% endblock %}
+
+{% block content %}
+    <div id="jobs">
+      <table class="jobs">
+        {% for entity in entities %}
+          <tr class="{{ cycle(['even', 'odd'], loop.index) }}">
+            <td class="location">{{ entity.location }}</td>
+            <td class="position">
+              <a href="{{ path('ens_job_show', { 'id': entity.id }) }}">
+                {{ entity.position }}
+              </a>
+            </td>
+            <td class="company">{{ entity.company }}</td>
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+{% endblock %}
+
+
+	C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\views\Job\show.html.twig
+
+{% extends 'EnsJobeetBundle::layout.html.twig' %} <- layout
+ 
+{% block title %} <- title
+    {{ entity.company }} is looking for a {{ entity.position }}
+{% endblock %}
+ 
+{% block stylesheets %} <- style css
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('bundles/ensjobeet/css/job.css') }}" type="text/css" media="all" />
+{% endblock %}
+ 
+{% block content %}
+    <div id="job">
+      <h1>{{ entity.company }}</h1>
+      <h2>{{ entity.location }}</h2>
+      <h3>
+        {{ entity.position }}
+        <small> - {{ entity.type }}</small>
+      </h3>
+ 
+      {% if entity.logo %}
+        <div class="logo">
+          <a href="{{ entity.url }}">
+            <img src="/uploads/jobs/{{ entity.logo }}"
+              alt="{{ entity.company }} logo" />
+          </a>
+        </div>
+      {% endif %}
+ 
+      <div class="description">
+        {{ entity.description|nl2br }}
+      </div>
+ 
+      <h4>How to apply?</h4>
+ 
+      <p class="how_to_apply">{{ entity.howtoapply }}</p>
+ 
+      <div class="meta">
+        <small>posted on {{ entity.createdat|date('m/d/Y') }}</small>
+      </div>
+ 
+      <div style="padding: 20px 0">
+        <a href="{{ path('ens_job_edit', { 'id': entity.id }) }}">
+          Edit
+        </a>
+      </div>
+    </div>
+{% endblock %}
+

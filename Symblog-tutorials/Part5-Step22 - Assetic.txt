@@ -1,0 +1,65 @@
+1. Pod³aczanie css
+
+{#   
+    {% stylesheets
+        '@BloggerBlogBundle/Resources/public/css/*'
+        
+        '@BloggerBlogBundle/Resources/public/css/blog.css'
+        '@BloggerBlogBundle/Resources/public/css/sidebar.css'
+    %}
+        <link href="{{ asset_url }}" rel="stylesheet" media="screen" />
+    {% endstylesheets %}
+#}
+
+2. Pod³aczanie js
+
+{#
+	{% javascripts
+	    '@BloggerBlogBundle/Resources/public/js/*'
+	%}
+	    <script type="text/javascript" src="{{ asset_url }}"></script>
+	{% endjavascripts %}
+#}
+
+3. Filtry
+
+# app/config/config.yml
+
+# ..
+
+assetic:
+    filters:
+        yui_css:
+            jar: %kernel.root_dir%/Resources/java/yuicompressor-2.4.6.jar
+
+# ..
+
+4.
+
+{# src/Blogger/BlogBundle/Resources/views/layout.html.twig #}
+
+{# .. #}
+
+{% stylesheets
+    '@BloggerBlogBundle/Resources/public/css/*'
+    output='css/blogger.css'
+    filter='yui_css'
+%}
+    <link href="{{ asset_url }}" rel="stylesheet" media="screen" />
+{% endstylesheets %}
+
+{# .. #}
+
+5.
+
+{% stylesheets
+    '@BloggerBlogBundle/Resources/public/css/*'
+    output='css/blogger.css'
+    filter='?yui_css'
+%}
+    <link href="{{ asset_url }}" rel="stylesheet" media="screen" />
+{% endstylesheets %}
+
+6.
+
+$ app/console --env=prod assetic:dump

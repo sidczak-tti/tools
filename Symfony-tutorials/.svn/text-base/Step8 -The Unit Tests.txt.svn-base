@@ -1,0 +1,195 @@
+Help: http://www.withoutthea.com/2011/03/configuring-phpunit-on-wamp-2-x/
+
+1. Navigate to C:\Wamp\bin\php\php5.3.4 (replace with your current PHP version). 
+   Create a folder named PEAR inside the php5.3.4 directory.
+
+2. Download go-pear.phar from pear.php.net and save it to C:\Wamp\bin\php\php5.3.4\PEAR
+
+3. cd \Wamp\bin\php\php5.3.4
+
+4. php –d phar.require_hash=0 PEAR/go-pear.phar
+	local - instalation
+
+5. Open both C:\Wamp\bin\php\php5.3.4\php.ini and C:\Wamp\bin\apache\Apache2.2.17\bin\php.ini. 
+   Add C:\Wamp\bin\php\php5.3.4\PEAR to the include_path in both files.  Yours may differ slightly, but it should be similar to this:
+
+	include_path=".;C:\wamp\bin\php\php5.3.4\PEAR" <- PEAR - du¿ymi literami
+	
+	phar.require_hash = Off
+
+ W³¹czamy serwer wamp
+
+
+6.
+
+	pear list
+
+	pear channel-discover pear.phpunit.de
+	pear channel-discover pear.symfony-project.com
+	pear channel-discover components.ez.no
+
+	pear search –c pear.phpunit.de phpunit
+
+pear clear-cache
+pear update-channels
+pear install --alldeps phpunit/PHPUnit
+
+
+#	pear install –a –f phpunit/PHPUnit
+
+#PHPUnit is now installed.  The phpunit.bat file you will need is in the PEAR executables directory.  You can find this by executing pear config-show.
+
+
+//jeœli test nie dzai³a
+pear list-channels // wyœwietlanie listy
+pear upgrade-all
+pear install phpunit/PHPUnit
+
+
+
+
+7. Uruchomienie wszystkich testów
+
+	$ phpunit -c app/
+
+
+
+8. Tworzenie nowego testu
+
+// src/Ens/JobeetBundle/Tests/Utils/JobeetTest.php
+ 
+namespace Ens\JobeetBundle\Tests\Utils;
+use Ens\JobeetBundle\Utils\Jobeet;
+ 
+class JobeetTest extends \PHPUnit_Framework_TestCase
+{
+  public function testSlugify()
+  {
+    $this->assertEquals('sensio', Jobeet::slugify('Sensio'));
+    $this->assertEquals('sensio-labs', Jobeet::slugify('sensio labs'));
+    $this->assertEquals('sensio-labs', Jobeet::slugify('sensio   labs'));
+    $this->assertEquals('paris-france', Jobeet::slugify('paris,france'));
+    $this->assertEquals('sensio', Jobeet::slugify('  sensio'));
+    $this->assertEquals('sensio', Jobeet::slugify('sensio  '));
+  }
+}
+
+9. Uruchomienie testu
+
+	phpunit -c app/ src/Ens/JobeetBundle/Tests/Utils/JobeetTest
+
+10. Dodanie testu
+
+	$this->assertEquals('n-a', Jobeet::slugify(''));
+
+11. Poprawienie metody:
+
+// src/Ens/JobeetBundle/Utils/Jobeet.php
+// ...
+ 
+static public function slugify($text)
+{
+  if (empty($text))
+  {
+    return 'n-a';
+  }
+ 
+// ...
+}
+
+
+12.Dodanie testu:
+
+	$this->assertEquals('n-a', Jobeet::slugify(' - '));
+
+13. Poprawienie metody:
+
+
+// src/Ens/JobeetBundle/Utils/Jobeet.php
+ 
+namespace Ens\JobeetBundle\Utils;
+class Jobeet
+{
+    static public function slugify($text)
+    {
+    	
+
+        // replace all non letters or digits by -
+        $text = preg_replace('/\W+/', '-', $text);
+ 
+        // trim and lowercase
+        $text = strtolower(trim($text, '-'));
+
+    	if (empty($text))
+	    {
+			return 'n-a';
+		}
+        
+        return $text;
+    }
+}
+
+14. Dodanie testu:
+
+	$this->assertEquals('developpeur-web', Jobeet::slugify('Développeur Web'));
+
+15. Poprawienie metody:
+
+// src/Ens/JobeetBundle/Utils/Jobeet.php
+static public function slugify($text)
+{
+  // replace non letter or digits by -
+  $text = preg_replace('#[^\\pL\d]+#u', '-', $text);
+ 
+  // trim
+  $text = trim($text, '-');
+ 
+  // transliterate
+  if (function_exists('iconv'))
+  {
+    $text = iconv('utf-8', 'us-ascii//TRANSLIT', $text);
+  }
+ 
+  // lowercase
+  $text = strtolower($text);
+ 
+  // remove unwanted characters
+  $text = preg_replace('#[^-\w]+#', '', $text);
+ 
+  if (empty($text))
+  {
+    return 'n-a';
+  }
+ 
+  return $text;
+}
+
+
+16. Ca³y test:
+
+<?php
+
+// src/Ens/JobeetBundle/Tests/Utils/JobeetTest.php
+ 
+namespace Ens\JobeetBundle\Tests\Utils;
+use Ens\JobeetBundle\Utils\Jobeet;
+ 
+class JobeetTest extends \PHPUnit_Framework_TestCase
+{
+  public function testSlugify()
+  {
+    $this->assertEquals('sensio', Jobeet::slugify('Sensio'));
+    $this->assertEquals('sensio-labs', Jobeet::slugify('sensio labs'));
+    $this->assertEquals('sensio-labs', Jobeet::slugify('sensio   labs'));
+    $this->assertEquals('paris-france', Jobeet::slugify('paris,france'));
+    $this->assertEquals('sensio', Jobeet::slugify('  sensio'));
+    $this->assertEquals('sensio', Jobeet::slugify('sensio  '));
+    $this->assertEquals('n-a', Jobeet::slugify(''));
+    $this->assertEquals('n-a', Jobeet::slugify(' - '));
+    //$this->assertEquals('developpeur-web', Jobeet::slugify('Développeur Web'));
+	  if (function_exists('iconv'))
+	{
+	  $this->assertEquals('developpeur-web', Jobeet::slugify('Développeur Web'));
+	}
+  }
+}

@@ -1,0 +1,452 @@
+1. C:/sf2_tutorials/jobeet2/app/config/parameters.ini
+
+[parameters]
+    database_driver="pdo_mysql"
+    database_host="localhost"
+    database_name="jobeet2"
+    database_user="root"
+    database_password=""
+    mailer_transport="smtp"
+    mailer_host="localhost"
+    mailer_user=""
+    mailer_password=""
+    locale="en"
+    secret="64a48d528fdd888168b3a95df30ece2435747749"
+
+
+2. Tworzenie bazy danych
+
+	php app/console doctrine:database:create
+
+3. Tworzenie tabel bazy danych
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/Category.orm.yml
+Ens\JobeetBundle\Entity\Category:
+  type: entity
+  table: category
+  id:
+    id:
+      type: integer
+      generator: { strategy: AUTO }
+  fields:
+    name:
+      type: string
+      length: 255
+      unique: true
+  oneToMany:
+    jobs:
+      targetEntity: Job
+      mappedBy: category
+    category_affiliates:
+      targetEntity: CategoryAffiliate
+      mappedBy: category
+
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/Job.orm.yml
+Ens\JobeetBundle\Entity\Job:
+  type: entity
+  table: job
+  id:
+    id:
+      type: integer
+      generator: { strategy: AUTO }
+  fields:
+    type:
+      type: string
+      length: 255
+      nullable: true
+    company:
+      type: string
+      length: 255
+    logo:
+      type: string
+      length: 255
+      nullable: true
+    url:
+      type: string
+      length: 255
+      nullable: true
+    position:
+      type: string
+      length: 255
+    location:
+      type: string
+      length: 255
+    description:
+      type: text
+    how_to_apply:
+      type: text
+    token:
+      type: string
+      length: 255
+      unique: true
+    is_public:
+      type: boolean
+      nullable: true
+    is_activated:
+      type: boolean
+      nullable: true
+    email:
+      type: string
+      length: 255
+    expires_at:
+      type: datetime
+    created_at:
+      type: datetime
+    updated_at:
+      type: datetime
+      nullable: true
+  manyToOne:
+    category:
+      targetEntity: Category
+      inversedBy: jobs
+      joinColumn:
+        name: category_id
+        referencedColumnName: id
+  lifecycleCallbacks:
+    prePersist: [ setCreatedAtValue ]
+    preUpdate: [ setUpdatedAtValue ]
+
+
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/Affiliate.orm.yml
+Ens\JobeetBundle\Entity\Affiliate:
+  type: entity
+  table: affiliate
+  id:
+    id:
+      type: integer
+      generator: { strategy: AUTO }
+  fields:
+    url:
+      type: string
+      length: 255
+    email:
+      type: string
+      length: 255
+      unique: true
+    token:
+      type: string
+      length: 255
+    created_at:
+      type: datetime
+  oneToMany:
+    category_affiliates:
+      targetEntity: CategoryAffiliate
+      mappedBy: affiliate
+  lifecycleCallbacks:
+    prePersist: [ setCreatedAtValue ]
+
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/CategoryAffiliate.orm.yml
+Ens\JobeetBundle\Entity\CategoryAffiliate:
+  type: entity
+  table: category_affiliate
+  id:
+    id:
+      type: integer
+      generator: { strategy: AUTO }
+  manyToOne:
+    category:
+      targetEntity: Category
+      inversedBy: category_affiliates
+      joinColumn:
+        name: category_id
+        referencedColumnName: id
+    affiliate:
+      targetEntity: Affiliate
+      inversedBy: category_affiliates
+      joinColumn:
+        name: affiliate_id
+        referencedColumnName: id
+
+4. Tworzenie nowych klas
+
+	php app/console doctrine:generate:entities EnsJobeetBundle
+
+
+Dodajemy wpisy
+// src/Ens/JobeetBundle/Entity/Job.php
+// ...
+public function setCreatedAtValue()
+{
+  if(!$this->getCreatedAt())
+  {
+    $this->created_at = new \DateTime();
+  }
+}
+// ...
+public function setUpdatedAtValue()
+{
+  $this->updated_at = new \DateTime();
+}
+
+// src/Ens/JobeetBundle/Entity/Affiliate.php
+// ...
+public function setCreatedAtValue()
+{
+  $this->created_at = new \DateTime();
+}
+
+
+5. Aktualizacja bazy danych
+
+	php app/console doctrine:schema:update --force
+
+
+
+6. Data Fixtures
+
+/* WARIANT1: AUTOMATYCZNE POD£¥CZENIE BIBLIOTEK - dla tego wariatu trzeba zaistalowaæ "git"
+****************************************************/
+
+	C:/sf2_tutorials/jobeet2/deps
+
+	Do pliku deps dodajemy nastêpuj¹ce wpisy:
+
+	[doctrine-fixtures]
+	    git=http://github.com/doctrine/data-fixtures.git
+ 
+	[DoctrineFixturesBundle]
+	    git=http://github.com/doctrine/DoctrineFixturesBundle.git
+	    target=/bundles/Symfony/Bundle/DoctrineFixturesBundle
+	    version=origin/2.0
+
+
+Update wersji biblioteki
+php bin/vendors install --reinstall
+
+
+Rejestracja bibliotek w projekcie
+
+/jobeet2/app/autoload.php
+//__DIR__ = "C:/sf2_tutorials/jobeet2/app" 
+
+// ...
+$loader->registerNamespaces(array(
+    // ...
+    'Doctrine\\Common\\DataFixtures' => __DIR__.'/../vendor/doctrine-fixtures/lib',
+    'Doctrine\\Common' => __DIR__.'/../vendor/doctrine-common/lib',
+    // ...
+));
+
+/jobeet2/app/AppKernel.php
+
+//C:/sf2_tutorials/jobeet2/vendor/symfony/src/Symfony/Bundle/DoctrineFixturesBundle
+//C:/sf2_tutorials/jobeet2/vendor/symfony/src/Symfony/Bundle = new Symfony\Bundle\DoctrineFixturesBundle
+// ...
+public function registerBundles()
+{
+    $bundles = array(
+        // ...
+        new Symfony\Bundle\DoctrineFixturesBundle\DoctrineFixturesBundle(),
+        // ...
+    );
+    // ...
+}
+
+/* WARIANT2: MANUALNE POD£¥CZENIE BIBLIOTEK
+****************************************************/
+
+http://inchoo.net/tools-frameworks/symfony2-data-fixtures-setup/
+
+
+a. Rozpakowujemy paczkê "symfony-DoctrineFixturesBundle-275e33b.zip" i dodajemy w strukturê katalogów:
+
+	/jobeet2
+	/vendor
+	/symfony
+	/src
+		/Symfony
+			/Bundle
+				/DoctrineFixturesBundle
+
+b. Rozpakowujemy paczkê doctrine-data-fixtures-4a8464e.zip i dodajemy w strukturê katalogów:
+
+	/jobeet2
+		/vendor
+        		/doctrine-data-fixtures
+
+
+c. Dodajemy wpisy: /jobeet2/app/autoload.php
+//__DIR__ = "C:/sf2_tutorials/jobeet2/app"
+// ...
+$loader->registerNamespaces(array(
+    // ...
+    'Doctrine\\Common\\DataFixtures' => __DIR__.'/../vendor/doctrine-data-fixtures/lib',
+    'Doctrine\\Common' => __DIR__.'/../vendor/doctrine-common/lib',
+    // ...
+));
+
+
+d. Dodajemy wpisy: /jobeet2/app/AppKernel.php
+
+//C:/sf2_tutorials/jobeet2/vendor/symfony/src/Symfony/Bundle/DoctrineFixturesBundle
+//C:/sf2_tutorials/jobeet2/vendor/symfony/src/Symfony/Bundle = new Symfony\Bundle\DoctrineFixturesBundle
+
+app/AppKernel.php
+
+// ...
+public function registerBundles()
+{
+    $bundles = array(
+        // ...
+        new Symfony\Bundle\DoctrineFixturesBundle\DoctrineFixturesBundle(),
+        // ...
+    );
+    // ...
+}
+
+
+
+
+7. Dodanie danych testowych:
+
+src/Ens/JobeetBundle/DataFixtures/ORM
+
+<?php
+
+// src/Ens/JobeetBundle/DataFixtures/ORM/LoadCategoryData.php
+namespace Ens\JobeetBundle\DataFixtures\ORM;
+ 
+use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\Common\DataFixtures\AbstractFixture;
+use Doctrine\Common\DataFixtures\OrderedFixtureInterface;
+use Ens\JobeetBundle\Entity\Category;
+ 
+class LoadCategoryData extends AbstractFixture implements OrderedFixtureInterface
+{
+  public function load(ObjectManager $em)
+  {
+    $design = new Category();
+    $design->setName('Design');
+ 
+    $programming = new Category();
+    $programming->setName('Programming');
+ 
+    $manager = new Category();
+    $manager->setName('Manager');
+ 
+    $administrator = new Category();
+    $administrator->setName('Administrator');
+ 
+    $em->persist($design);
+    $em->persist($programming);
+    $em->persist($manager);
+    $em->persist($administrator);
+ 
+    $em->flush();
+ 
+    $this->addReference('category-design', $design);
+    $this->addReference('category-programming', $programming);
+    $this->addReference('category-manager', $manager);
+    $this->addReference('category-administrator', $administrator);
+  }
+ 
+  public function getOrder()
+  {
+    return 1; // the order in which fixtures will be loaded
+  }
+}
+
+<?php
+
+// src/Ens/JobeetBundle/DataFixtures/ORM/LoadJobData.php
+namespace Ens\JobeetBundle\DataFixtures\ORM;
+ 
+use Doctrine\Common\Persistence\ObjectManager;
+use Doctrine\Common\DataFixtures\AbstractFixture;
+use Doctrine\Common\DataFixtures\OrderedFixtureInterface;
+use Ens\JobeetBundle\Entity\Job;
+ 
+class LoadJobData extends AbstractFixture implements OrderedFixtureInterface
+{
+  public function load(ObjectManager $em)
+  {
+    $job_sensio_labs = new Job();
+    $job_sensio_labs->setCategory($em->merge($this->getReference('category-programming')));
+    $job_sensio_labs->setType('full-time');
+    $job_sensio_labs->setCompany('Sensio Labs');
+    $job_sensio_labs->setLogo('sensio-labs.gif');
+    $job_sensio_labs->setUrl('http://www.sensiolabs.com/');
+    $job_sensio_labs->setPosition('Web Developer');
+    $job_sensio_labs->setLocation('Paris, France');
+    $job_sensio_labs->setDescription('You\'ve already developed websites with symfony and you want to work with Open-Source technologies. You have a minimum of 3 years experience in web development with PHP or Java and you wish to participate to development of Web 2.0 sites using the best frameworks available.');
+    $job_sensio_labs->setHowToApply('Send your resume to fabien.potencier [at] sensio.com');
+    $job_sensio_labs->setIsPublic(true);
+    $job_sensio_labs->setIsActivated(true);
+    $job_sensio_labs->setToken('job_sensio_labs');
+    $job_sensio_labs->setEmail('job@example.com');
+    $job_sensio_labs->setExpiresAt(new \DateTime('2012-10-10'));
+ 
+    $job_extreme_sensio = new Job();
+    $job_extreme_sensio->setCategory($em->merge($this->getReference('category-design')));
+    $job_extreme_sensio->setType('part-time');
+    $job_extreme_sensio->setCompany('Extreme Sensio');
+    $job_extreme_sensio->setLogo('extreme-sensio.gif');
+    $job_extreme_sensio->setUrl('http://www.extreme-sensio.com/');
+    $job_extreme_sensio->setPosition('Web Designer');
+    $job_extreme_sensio->setLocation('Paris, France');
+    $job_extreme_sensio->setDescription('Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in.');
+    $job_extreme_sensio->setHowToApply('Send your resume to fabien.potencier [at] sensio.com');
+    $job_extreme_sensio->setIsPublic(true);
+    $job_extreme_sensio->setIsActivated(true);
+    $job_extreme_sensio->setToken('job_extreme_sensio');
+    $job_extreme_sensio->setEmail('job@example.com');
+    $job_extreme_sensio->setExpiresAt(new \DateTime('2012-10-10'));
+ 
+    $em->persist($job_sensio_labs);
+    $em->persist($job_extreme_sensio);
+ 
+    $em->flush();
+  }
+ 
+  public function getOrder()
+  {
+    return 2; // the order in which fixtures will be loaded
+  }
+}
+
+
+8. Za³adoanie danych do bazy danych
+
+	php app/console doctrine:fixtures:load
+
+
+9. Tworzenie CRUD
+
+	php app/console doctrine:generate:crud --entity=EnsJobeetBundle:Job --route-prefix=ens_job --with-write --format=yml
+
+10. Nowy C:\sf2_tutorials\jobeet2\src\Ens\JobeetBundle\Resources\config\routing.yml
+
+	# src/EnsJobeetBundle/Resources/config/routing.yml <- Dodajemy w plyku yml œcie¿kê do routingu
+	EnsJobeetBundle_job:
+	    resource: "@EnsJobeetBundle/Resources/config/routing/job.yml"
+	    prefix: /job
+ 
+	EnsJobeetBundle_homepage:
+	    pattern:  /hello/{name}
+	    defaults: { _controller: EnsJobeetBundle:Default:index }
+
+11. Dodanie metody magicznej __toString()
+
+	Klucze obce s¹ pokazywane tylko w edit i new
+	Natomiast na stronie index i show nie wyswietla kluczy obcych
+
+	// src/Ens/JobeetBundle/Entity/Category.php
+	// ...
+	public function __toString()
+	{
+	  return $this->getName();
+	}
+
+12. Czyszczenie pamiêci podrêcznej:
+
+	php app/console cache:clear --env=prod
+	php app/console cache:clear --env=dev
+
+
+
+
+
+

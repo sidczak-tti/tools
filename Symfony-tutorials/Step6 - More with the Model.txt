@@ -1,0 +1,421 @@
+1.	Dodanie pracy która wygas³a
+
+// src/Ens/JobeetBundle/DataFixtures/ORM/LoadJobData.php
+// ...
+ 
+$job_expired = new Job();
+$job_expired->setCategory($em->merge($this->getReference('category-programming')));
+$job_expired->setType('full-time');
+$job_expired->setCompany('Sensio Labs');
+$job_expired->setLogo('sensio-labs.gif');
+$job_expired->setUrl('http://www.sensiolabs.com/');
+$job_expired->setPosition('Web Developer Expired');
+$job_expired->setLocation('Paris, France');
+$job_expired->setDescription('Lorem ipsum dolor sit amet, consectetur adipisicing elit.');
+$job_expired->setHowToApply('Send your resume to lorem.ipsum [at] dolor.sit');
+$job_expired->setIsPublic(true);
+$job_expired->setIsActivated(true);
+$job_expired->setToken('job_expired');
+$job_expired->setEmail('job@example.com');
+$job_expired->setCreatedAt(new \DateTime('2005-12-01'));
+ 
+// ...
+ 
+$em->persist($job_expired);
+
+php app/console doctrine:fixtures:load
+
+
+2.
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+//Wyœwietlanie listy aktywnych prac
+    public function indexAction()
+    {
+        $em = $this->getDoctrine()->getEntityManager();
+
+        //$entities = $em->getRepository('EnsJobeetBundle:Job')->findAll();
+        
+		$query = $em->createQuery(
+			'SELECT j FROM EnsJobeetBundle:Job j WHERE j.created_at > :date'
+		)->setParameter('date', date('Y-m-d H:i:s', time() - 86400 * 30));
+		$entities = $query->getResult();
+
+        return $this->render('EnsJobeetBundle:Job:index.html.twig', array(
+            'entities' => $entities
+        ));
+    }
+
+3.
+
+# src/Ens/JobeetBundle/Resources/config/doctrine/Job.orm.yml
+# ...
+ 
+  lifecycleCallbacks:
+    prePersist: [ setCreatedAtValue, setExpiresAtValue ]
+    preUpdate: [ setUpdatedAtValue ]
+
+
+php app/console doctrine:generate:entities EnsJobeetBundle
+
+4.
+
+# src/Ens/JobeetBundle/Entity/Job.php
+# ...
+ 
+public function setExpiresAtValue()
+{
+  if(!$this->getExpiresAt())
+  {
+    $now = $this->getCreatedAt() ? $this->getCreatedAt()->format('U') : time();
+    $this->expires_at = new \DateTime(date('Y-m-d H:i:s', $now + 86400 * 30));
+  }
+}
+
+5.
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+//Wyœwietlanie listy aktywnych prac, które nie wygas³y
+    public function indexAction()
+    {
+        $em = $this->getDoctrine()->getEntityManager();
+
+        //$entities = $em->getRepository('EnsJobeetBundle:Job')->findAll();
+        /*
+		$query = $em->createQuery(
+			'SELECT j FROM EnsJobeetBundle:Job j WHERE j.created_at > :date'
+		)->setParameter('date', date('Y-m-d H:i:s', time() - 86400 * 30));
+		$entities = $query->getResult();
+		*/
+		$query = $em->createQuery(
+			'SELECT j FROM EnsJobeetBundle:Job j WHERE j.expires_at > :date'
+		)->setParameter('date', date('Y-m-d H:i:s', time()));
+		$entities = $query->getResult();
+
+        return $this->render('EnsJobeetBundle:Job:index.html.twig', array(
+            'entities' => $entities
+        ));
+    }
+
+6. Refactoring - przeniesienie kodu z kontrolera do modelu
+
+# /src/Ens/JobeetBundle/Resources/config/doctrine/Job.orm.yml
+# Dodanie repozytorium 
+Ens\JobeetBundle\Entity\Job:
+  type: entity
+  repositoryClass: Ens\JobeetBundle\Repository\JobRepository
+
+
+php app/console doctrine:generate:entities EnsJobeetBundle
+
+#Przeniesienie kodu do repozytorium
+
+// src/Ens/JobeetBundle/Repository/JobRepository.php
+ 
+namespace Ens\JobeetBundle\Repository;
+use Doctrine\ORM\EntityRepository;
+ 
+class JobRepository extends EntityRepository
+{
+  public function getActiveJobs($category_id = null)
+  {
+    $qb = $this->createQueryBuilder('j')
+      ->where('j.expires_at > :date')
+      ->setParameter('date', date('Y-m-d H:i:s', time()))
+      ->orderBy('j.expires_at', 'DESC');
+ 
+    if($category_id)
+    {
+      $qb->andWhere('j.category = :category_id')
+         ->setParameter('category_id', $category_id);
+    }
+ 
+    $query = $qb->getQuery();
+ 
+    return $query->getResult();
+  }
+}
+
+
+#Przebudowa kontrolera
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+// ...
+ 
+public function indexAction()
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $entities = $em->getRepository('EnsJobeetBundle:Job')->getActiveJobs();
+ 
+  return $this->render('EnsJobeetBundle:Job:index.html.twig', array(
+    'entities' => $entities
+  ));
+}
+
+
+7. Categories on the Homepage
+Posortowanie prac wed³ug kategorii na stronie g³ównej
+
+
+# /src/Ens/JobeetBundle/Resources/config/doctrine/Category.orm.yml
+# Tworzymy repozytorium dla Category 
+Ens\JobeetBundle\Entity\Category:
+  type: entity
+  repositoryClass: Ens\JobeetBundle\Repository\CategoryRepository
+  #...
+
+php app/console doctrine:generate:entities EnsJobeetBundle
+
+
+Otwieramy nowo powsta³¹ klasê i dodajemy metode getWithJobs()
+// src/Ens/JobeetBundle/Repository/CategoryRepository.php
+ 
+namespace Ens\JobeetBundle\Repository;
+use Doctrine\ORM\EntityRepository;
+ 
+class CategoryRepository extends EntityRepository
+{
+  public function getWithJobs()
+  {
+    $query = $this->getEntityManager()->createQuery(
+      'SELECT c FROM EnsJobeetBundle:Category c LEFT JOIN c.jobs j WHERE j.expires_at > :date'
+    )->setParameter('date', date('Y-m-d H:i:s', time()));
+ 
+    return $query->getResult();
+  }
+}
+
+
+Zmieniamy wpis w kontrolerze
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+
+public function indexAction()
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $categories = $em->getRepository('EnsJobeetBundle:Category')->getWithJobs();
+ 
+  foreach($categories as $category)
+  {
+    $category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId()));
+  }
+ 
+  return $this->render('EnsJobeetBundle:Job:index.html.twig', array(
+    'categories' => $categories
+  ));
+}
+
+Dodajemy nowe w³aœciwoœci
+
+// src/Ens/JobeetBundle/Entity/Category.php
+ 
+namespace Ens\JobeetBundle\Entity;
+use Doctrine\ORM\Mapping as ORM;
+ 
+class Category
+{
+  // ...
+ 
+  private $active_jobs;
+ 
+  // ...
+ 
+  public function setActiveJobs($jobs)
+  {
+    $this->active_jobs = $jobs;
+  }
+ 
+  public function getActiveJobs()
+  {
+    return $this->active_jobs;
+  }
+}
+
+W szablonie wykonujemy iteracje wszystkich kategorii i wyœwietlamy aktywne prace
+
+<!-- src/Ens/JobeetBundle/Resources/views/Job/index.html.twig -->
+<!-- ... -->
+ 
+{% block content %}
+  <div id="jobs">
+    {% for category in categories %}
+      <div>
+        <div class="category">
+          <div class="feed">
+            <a href="">Feed</a>
+          </div>
+          <h1>{{ category.name }}</h1>
+        </div>
+        <table class="jobs">
+          {% for entity in category.activejobs %}
+            <tr class="{{ cycle(['even', 'odd'], loop.index) }}">
+              <td class="location">{{ entity.location }}</td>
+              <td class="position">
+                <a href="{{ path('ens_job_show', { 'id': entity.id, 'company': entity.companyslug, 'location': entity.locationslug, 'position': entity.positionslug }) }}">
+                  {{ entity.position }}
+                </a>
+              </td>
+              <td class="company">{{ entity.company }}</td>
+            </tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}
+
+
+
+8. Limit the results
+Wyœwietlanie limitu 10 prac
+
+// src/Ens/JobeetBundle/Repository/JobRepository.php
+
+public function getActiveJobs($category_id = null, $max = null)
+{
+  $qb = $this->createQueryBuilder('j')
+    ->where('j.expires_at > :date')
+    ->setParameter('date', date('Y-m-d H:i:s', time()))
+    ->orderBy('j.expires_at', 'DESC');
+ 
+  if($max)
+  {
+    $qb->setMaxResults($max);
+  }
+ 
+  if($category_id)
+  {
+    $qb->andWhere('j.category = :category_id')
+       ->setParameter('category_id', $category_id);
+  }
+ 
+  $query = $qb->getQuery();
+ 
+  return $query->getResult();
+}
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+ 
+$category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId(), 10));
+
+
+Dodanie pliku konfiguracyjnego
+# app/config/config.yml
+# ...
+ 
+parameters:
+    max_jobs_on_homepage: 10
+
+// src/Ens/JobeetBundle/Controller/JobController
+// ...
+ 
+public function indexAction()
+{
+  $em = $this->getDoctrine()->getEntityManager();
+ 
+  $categories = $em->getRepository('EnsJobeetBundle:Category')->getWithJobs();
+ 
+  foreach($categories as $category)
+  {
+    $category->setActiveJobs($em->getRepository('EnsJobeetBundle:Job')->getActiveJobs($category->getId(), $this->container->getParameter('max_jobs_on_homepage')));
+  }
+ 
+  return $this->render('EnsJobeetBundle:Job:index.html.twig', array(
+    'categories' => $categories
+  ));
+}
+
+9. Dodanie danych testowych:
+
+// src/Ens/JobeetBundle/DataFixtures/ORM/LoadJobData.php
+// ...
+ 
+public function load(ObjectManager $em)
+{
+  // ...
+ 
+  for($i = 100; $i <= 130; $i++)
+  {
+    $job = new Job();
+    $job->setCategory($em->merge($this->getReference('category-programming')));
+    $job->setType('full-time');
+    $job->setCompany('Company '.$i);
+    $job->setPosition('Web Developer');
+    $job->setLocation('Paris, France');
+    $job->setDescription('Lorem ipsum dolor sit amet, consectetur adipisicing elit.');
+    $job->setHowToApply('Send your resume to lorem.ipsum [at] dolor.sit');
+    $job->setIsPublic(true);
+    $job->setIsActivated(true);
+    $job->setToken('job_'.$i);
+    $job->setEmail('job@example.com');
+ 
+    $em->persist($job);
+  }
+ 
+  $em->flush();
+}
+
+php app/console doctrine:fixtures:load
+
+
+10.Secure the Job Page
+Kiedy praca wygas³a i znasz adres URL strona nie zostanie wyœwietlona dziêki nastêpuj¹cemu kodowi:
+
+// src/Ens/JobeetBundle/Repository/JobRepository.php
+// ...
+ 
+public function getActiveJob($id)
+{
+  $query = $this->createQueryBuilder('j')
+    ->where('j.id = :id')
+    ->setParameter('id', $id)
+    ->andWhere('j.expires_at > :date')
+    ->setParameter('date', date('Y-m-d H:i:s', time()))
+    ->setMaxResults(1)
+    ->getQuery();
+ 
+  try {
+    $job = $query->getSingleResult();
+  } catch (\Doctrine\Orm\NoResultException $e) {
+    $job = null;
+  }
+ 
+  return $job;
+}
+
+
+// src/Ens/JobeetBundle/Controller/JobController.php
+
+    public function showAction($id)
+    {
+        $em = $this->getDoctrine()->getEntityManager();
+
+        //$entity = $em->getRepository('EnsJobeetBundle:Job')->find($id);
+        $entity = $em->getRepository('EnsJobeetBundle:Job')->getActiveJob($id);
+
+        if (!$entity) {
+            throw $this->createNotFoundException('Unable to find Job entity.');
+        }
+
+        $deleteForm = $this->createDeleteForm($id);
+
+        return $this->render('EnsJobeetBundle:Job:show.html.twig', array(
+            'entity'      => $entity,
+            'delete_form' => $deleteForm->createView(),
+        ));
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+

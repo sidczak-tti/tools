@@ -1,0 +1,77 @@
+1.	Routing
+
+# src/Blogger/BlogBundle/Resources/config/routing.yml
+BloggerBlogBundle_blog_show:
+    pattern:  /{id}
+    defaults: { _controller: BloggerBlogBundle:Blog:show }
+    requirements:
+        _method:  GET
+        id: \d+
+
+2.	Kontroler
+
+<?php
+// src/Blogger/BlogBundle/Controller/BlogController.php
+
+namespace Blogger\BlogBundle\Controller;
+
+use Symfony\Bundle\FrameworkBundle\Controller\Controller;
+
+/**
+ * Blog controller.
+ */
+class BlogController extends Controller
+{
+    /**
+     * Show a blog entry
+     */
+    public function showAction($id)
+    {
+        $em = $this->getDoctrine()->getEntityManager();
+
+        $blog = $em->getRepository('BloggerBlogBundle:Blog')->find($id);
+
+        if (!$blog) {
+            throw $this->createNotFoundException('Unable to find Blog post.');
+        }
+
+        return $this->render('BloggerBlogBundle:Blog:show.html.twig', array(
+            'blog'      => $blog,
+        ));
+    }
+}
+
+3. View
+
+{# src/Blogger/BlogBundle/Resouces/views/Blog/show.html.twig #}
+{% extends 'BloggerBlogBundle::layout.html.twig' %}
+
+{% block title %}{{ blog.title }}{% endblock %}
+
+{% block body %}
+    <article class="blog">
+        <header>
+            <div class="date"><time datetime="{{ blog.created|date('c') }}">{{ blog.created|date('l, F j, Y') }}</time></div>
+            <h2>{{ blog.title }}</h2>
+        </header>
+        <img src="{{ asset(['images/', blog.image]|join) }}" alt="{{ blog.title }} image not found" class="large" />
+        <div>
+            <p>{{ blog.blog }}</p>
+        </div>
+    </article>
+{% endblock %}
+
+4. CSS
+
+src/Blogger/BlogBundle/Resouces/public/css/blog.css
+
+.date { margin-bottom: 20px; border-bottom: 1px solid #ccc; font-size: 24px; color: #666; line-height: 30px }
+.blog { margin-bottom: 20px; }
+.blog img { width: 190px; float: left; padding: 5px; border: 1px solid #ccc; margin: 0 10px 10px 0; }
+.blog .meta { clear: left; margin-bottom: 20px; }
+.blog .snippet p.continue { margin-bottom: 0; text-align: right; }
+.blog .meta { font-style: italic; font-size: 12px; color: #666; }
+.blog .meta p { margin-bottom: 5px; line-height: 1.2em; }
+.blog img.large { width: 300px; min-height: 165px; }
+
+$ php app/console assets:install web
